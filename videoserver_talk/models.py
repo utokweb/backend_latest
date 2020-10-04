@@ -12,6 +12,14 @@ import sys
 from django.db import transaction
 from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage
 
+import firebase_admin
+from firebase_admin import credentials
+import datetime
+from firebase_admin import messaging
+
+cred = credentials.Certificate('fcm.json')
+firebase_admin.initialize_app(cred)
+
 def user_directory_path_profile(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
     return 'profile_{0}/{1}'.format(instance.user.id, instance.user.username)
@@ -24,8 +32,21 @@ class PhoneNumber(models.Model):
     followerCount = models.IntegerField(default=0,blank=True)
     followingCount = models.IntegerField(default=0,blank=True)
     postCount = models.IntegerField(default=0,blank=True)
+    elevation = models.IntegerField(null=True,blank=False,default=0)
+    gender = models.CharField(max_length=20, blank=True,null=False)
+    age = models.IntegerField(default=0,blank=True)
+    birthDate = models.DateField(auto_created=False,blank=True,null=True)
+
     
     #birthdDate = models.DateField(auto_created = True,blank=True)
+class Notification(models.Model):
+    fromId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='userNotification')
+    toId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='usertoNotification')
+    fromUsername = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='mainusertoNotification')
+    types = models.CharField(max_length=30,blank=True,null=True)
+    message = models.CharField(max_length=200,blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True)
+
 
 def get_random_string(length):
     letters = string.ascii_lowercase
@@ -35,6 +56,21 @@ def get_random_string(length):
 def user_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
     return 'user_{0}/{1}'.format(instance.owner.id, filename)
+
+class MusicTracks(models.Model):
+    musicFile = models.FileField(storage=PublicMediaStorage(),blank=True,null=True)
+    musicName = models.CharField(max_length=30, blank=True,null=True)
+    metaData = models.CharField(max_length=30, blank=True,null=True)
+    category= models.CharField(max_length=30, blank=True,null=True)
+    genre =  models.CharField(max_length=30, blank=True,null=True)
+    duration = models.IntegerField(null=True,blank=False,default=0.00)
+    popularityCount = models.IntegerField(null=True,blank=False,default=0.00)
+    albumArt = models.FileField(storage=PublicMediaStorage(),blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True)
+    popularity = models.IntegerField(null=True,blank=False,default=0.00)
+    fileSize = models.IntegerField(null=True,blank=False,default=0.00)
+
+
 class FileUpload(models.Model):
     privacy_choices = (
         ('only_me', 'Only Me'),
@@ -51,7 +87,27 @@ class FileUpload(models.Model):
     viewCount = models.IntegerField(default=0)
     hashtag = models.TextField(max_length=10001, blank=True)
     commentCount = models.IntegerField(default=0)
-        
+    musicTrack = models.ForeignKey(MusicTracks, related_name='musicTrack',on_delete=models.CASCADE,blank=True,null=True)
+    fileSize = models.IntegerField(null=True,blank=False,default=0.00)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6,blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6,blank=True)
+    profId = models.ForeignKey(PhoneNumber, to_field='id',on_delete=models.CASCADE,related_name='profIdFileupload')
+    category = models.CharField(max_length=20, blank=True,null=True)
+    frameId =  models.CharField(max_length=200, blank=True,null=True)
+    stickerId = models.CharField(max_length=200, blank=True,null=True)
+    
+
+
+
+class PostUploadTest(models.Model):
+    downloadUrl = models.FileField(storage=PublicMediaStorage())
+    fileName = models.CharField(max_length=20, blank=True,null=True)
+    post_format = models.CharField(max_length=20, blank=True,null=True)
+    durationMs = models.IntegerField(default=0)
+    frameRate = models.IntegerField(default=0)
+    category = models.CharField(max_length=20, blank=True,null=True)
+    frameCount = models.IntegerField(default=0)
+    fileSize = models.IntegerField(default=0)
 
 @receiver(post_save, sender=FileUpload, dispatch_uid="insert-hashtag")
 def update_hashtag(sender, instance, **kwargs):
@@ -78,6 +134,16 @@ def update_postcount(sender, instance,created,**kwargs):
         objProfile.postCount+=1
         objProfile.save()
 
+
+
+# @receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
+# def update_frame(sender, instance,created,**kwargs):
+#     if created:
+#         objProfile = PhoneNumber.objects.get(user=instance.owner_id)
+#         objProfile.postCount+=1
+#         objProfile.save()
+
+
 @receiver(post_delete, sender=FileUpload, dispatch_uid="delete_count")
 def delete_postCount(sender, instance, **kwargs):
     objProfile = PhoneNumber.objects.get(user=instance.owner_id)
@@ -85,10 +151,101 @@ def delete_postCount(sender, instance, **kwargs):
     objProfile.postCount-=1
     objProfile.save()
     
-                
+
+class FrameId(models.Model):
+    frameId = models.IntegerField(default=0)
+    frameCount = models.IntegerField(default=0)
+    user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='userIdFrame')
+
+    # class Meta:
+    #     unique_together = ('user', 'frameId')
+
+
+@receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
+def update_frame(sender, instance,created,**kwargs):
+    if created:
+        if instance.frameId:
+            frameTag = instance.frameId
+            frameTag = frameTag.split(",")
+            for data in frameTag:
+                try:
+                    try:
+                        obj = FrameId.objects.get(frameId=data)
+                        if obj:
+                            obj.frameCount+=1
+                            obj.save()
+                    except Exception as e:
+
+                        print("dddddddddddddddddddddddddddd")
+                        obj = FrameId(frameId=data,user=instance.owner)
+                        obj.save()
+                        obj = FrameId.objects.get(frameId=data)
+                        obj.frameCount+=1
+                        obj.save()
+
+                except Exception as e:
+                    print(e)
+                    pass
         
 
+@receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
+def update_frame(sender, instance,created,**kwargs):
+    if created:
+        if instance.frameId:
+            frameTag = instance.frameId
+            frameTag = frameTag.split(",")
+            for data in frameTag:
+                try:
+                    try:
+                        obj = FrameId.objects.get(frameId=data)
+                        if obj:
+                            obj.frameCount+=1
+                            obj.save()
+                    except Exception as e:
 
+                        print("dddddddddddddddddddddddddddd")
+                        obj = FrameId(frameId=data,user=instance.owner)
+                        obj.save()
+                        obj = FrameId.objects.get(frameId=data)
+                        obj.frameCount+=1
+                        obj.save()
+
+                except Exception as e:
+                    print(e)
+                    pass
+
+
+
+class StickerId(models.Model):
+    postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='postSticker')
+    stickerId = models.IntegerField(default=0)
+    stickerCount = models.IntegerField(default=0)
+    user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='userIdSticker')
+
+    
+
+@receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
+def update_sticker(sender, instance,created,**kwargs):
+    if created:
+        if instance.stickerId:
+            frameTag = instance.frameId
+            frameTag = frameTag.split(",")
+            for data in frameTag:
+                try:
+                    try:
+                        obj = StickerId.objects.get(stickerId=data)
+                        if obj:
+                            obj.stickerCount+=1
+                            obj.save()
+                    except Exception as e:
+                        obj = StickerId(stickerId=data,user=instance.owner)
+                        obj.save()
+                        obj = StickerId.objects.get(stickerId=data)
+                        obj.stickerCount+=1
+                        obj.save()
+                except Exception as e:
+                    print(e)
+                    pass
 class PostLike(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='post')
     user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='user')
@@ -101,6 +258,17 @@ class PostLike(models.Model):
     def __str__(self):
         return '%s-%s' % (self.user_id,self.postId_id)
 
+
+class SavedPost(models.Model):
+    postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='postsave')
+    user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='usersave')
+    like = models.SmallIntegerField(default=0,null=True,blank=True)
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+
+    class Meta:
+        unique_together = ('postId', 'user')
+    def __str__(self):
+        return '%s-%s' % (self.user_id,self.postId_id)
 
 class HashTag(models.Model):
     hashtag = models.CharField(default="",null=True,max_length=20,unique=True)
@@ -154,6 +322,53 @@ def update_follower(sender, instance, **kwargs):
     userObjectFollow.followingCount+=1
     userObjectFollow.save()
     
+class FirebaseNotification(models.Model):
+    user = models.ForeignKey(User,on_delete=models.PROTECT,null=True,related_name='user_fcm')
+    token = models.CharField(default="",null=True,max_length=200,unique=False)
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+
+@receiver(post_save, sender=FollowerModel, dispatch_uid="notification")
+def updateFollowNotifcation(sender, instance,created,**kwargs):
+    user_id = User.objects.get(id=instance.followerId.id)
+    reciever_id = User.objects.get(id=instance.followingId.id)
+    if created:
+        Notification.objects.create(fromId=user_id,toId=reciever_id,fromUsername=user_id,types="Follow",message=instance.followerId.username+" started Following You")
+        token=FirebaseNotification.objects.get(user=reciever_id)
+        
+        registration_token = token.token
+        profile_pic=PhoneNumber.objects.get(user_id=user_id)
+        profilePic = str(profile_pic.profilePic)
+        if profile_pic:
+            message = messaging.Message(
+            data={
+                'message': instance.followerId.username+" started Following You",
+                'fromId': str(user_id),
+                'toId':str(reciever_id),
+                'types':"Follow",
+                'profilePic':'https://utokcloud.s3-accelerate.amazonaws.com/media/'+profilePic,'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
+            },
+            token=registration_token,
+            
+            
+        )
+        else:
+            message = messaging.Message(
+            data={
+                'message': instance.followerId.username+" started Following You",
+                'fromId': str(user_id),
+                'toId':str(reciever_id),
+                'types':"Follow",
+                'profilePic':"",'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
+            },
+            token=registration_token,
+            
+            
+        )
+
+        response = messaging.send(message)
+        print(response)
+
+
 
 @receiver(post_save, sender=FollowerModel, dispatch_uid="update-following")
 def update_following(sender, instance, **kwargs):
@@ -195,7 +410,7 @@ class ReplyModel(models.Model):
         return '%s' % (self.id)
 
 class CommentLike(models.Model):
-    commentId = models.ForeignKey(CommentModel,on_delete=models.PROTECT,null=False,related_name='commentLike')
+    commentId = models.ForeignKey(CommentModel,on_delete=models.CASCADE,null=False,related_name='commentLike')
     user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='user_comment')
     like = models.SmallIntegerField(default=0,null=True,blank=True)
     created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
@@ -208,12 +423,12 @@ class CommentLike(models.Model):
         return '%s-%s' % (self.user_id,self.commentId_id)
 
 @receiver(post_save, sender=CommentModel, dispatch_uid="update-commentcount")
-def update_comment(sender, instance, **kwargs):
-    print(instance.postId)
-    objPost = FileUpload.objects.get(id=instance.postId_id)
-    print(objPost)
-    objPost.commentCount+=1
-    objPost.save()
+def update_comment(sender, instance,created, **kwargs):
+    if created:
+        objPost = FileUpload.objects.get(id=instance.postId_id)
+        print(objPost)
+        objPost.commentCount+=1
+        objPost.save()
 
 @receiver(post_delete, sender=CommentModel, dispatch_uid="update-commentcount")
 def decrement_comment(sender, instance, **kwargs):
@@ -224,12 +439,13 @@ def decrement_comment(sender, instance, **kwargs):
         objPost.save()
 
 @receiver(post_save, sender=CommentLike, dispatch_uid="update-commentcount")
-def update_commentCount(sender, instance, **kwargs):
-    print("r-------------------------------------")
-    objPost = CommentModel.objects.get(id=instance.commentId_id)
-    print(objPost)
-    objPost.likeCount+=1
-    objPost.save()
+def update_commentCount(sender, instance,created, **kwargs):
+    if created:
+        print("r-------------------------------------")
+        objPost = CommentModel.objects.get(id=instance.commentId_id)
+        print(objPost)
+        objPost.likeCount+=1
+        objPost.save()
 
 
 @receiver(post_delete, sender=CommentLike, dispatch_uid="update-commentcount")
@@ -240,9 +456,12 @@ def decrement_commentCount(sender, instance, **kwargs):
         objPost.likeCount-=1
         objPost.save()
 
+
+
+
 class ReplyLike(models.Model):
-    replyId = models.ForeignKey(ReplyModel,on_delete=models.PROTECT,null=False,related_name='replyLike')
-    user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='user_reply')
+    replyId = models.ForeignKey(ReplyModel,on_delete=models.CASCADE,null=True,related_name='replyLike')
+    user = models.ForeignKey(User,on_delete=models.PROTECT,null=True,related_name='user_reply')
     like = models.SmallIntegerField(default=0,null=True,blank=True)
     created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
     profId = models.ForeignKey(PhoneNumber,on_delete=models.PROTECT,null=False,related_name='profileIdreplyLike')
@@ -260,12 +479,12 @@ class ReplyLike(models.Model):
 #     objPost.commentCount+=1
 #     objPost.save()
 @receiver(post_save, sender=ReplyLike, dispatch_uid="update-replycount")
-def update_replyCount(sender, instance, **kwargs):
-    
-    objPost = ReplyModel.objects.get(id=instance.replyId_id)
-    
-    objPost.likeCount+=1
-    objPost.save()
+def update_replyCount(sender, instance,created, **kwargs):
+    if created:
+        objPost = ReplyModel.objects.get(id=instance.replyId_id)
+        
+        objPost.likeCount+=1
+        objPost.save()
 
 @receiver(post_delete, sender=ReplyLike, dispatch_uid="update-replycount")
 def decrement_replyCount(sender, instance, **kwargs):
@@ -274,3 +493,6 @@ def decrement_replyCount(sender, instance, **kwargs):
     if objPost.likeCount>0:
         objPost.likeCount-=1
         objPost.save()
+
+
+

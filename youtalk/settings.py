@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'storages',
+    'adzone'
     
 ]
 
@@ -81,6 +82,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'adzone.context_processors.get_source_ip'
             ],
         },
     },
@@ -95,7 +97,7 @@ WSGI_APPLICATION = 'youtalk.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'youtok7sept',
+        'NAME': 'youtok21sept',
         #youtok7sept
         'USER':'postgres',
         'PASSWORD':'Mynameis@321',
@@ -144,19 +146,22 @@ SETTINGS_PATH = os.path.normpath(os.path.dirname(__file__))
 TEMPLATE_DIRS = (
     os.path.join(SETTINGS_PATH, 'templates'),
 )
-# STATIC_URL = '/static/'
+STATIC_URL = '/static/'
+
+
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 USE_S3 = os.getenv('USE_S3') == 'TRUE'
 
 AWS_ACCESS_KEY_ID = 'AKIASDQL7WB73VVZBQGE'
 AWS_DEFAULT_ACL = None
 AWS_SECRET_ACCESS_KEY = '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'
-AWS_STORAGE_BUCKET_NAME = 'utok-s3-cloud'
+AWS_STORAGE_BUCKET_NAME = 'utokcloud'
 STATICFILES_STORAGE = 'youtalk.storage_backends.StaticStorage'
-AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_S3_CUSTOM_DOMAIN = '%s.s3-accelerate.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }

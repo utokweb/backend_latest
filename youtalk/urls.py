@@ -28,8 +28,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('vid_server/', include('videoserver_talk.urls')),
     path('api-token-auth/', obtain_auth_token, name='api_token_auth'),  # <-- And here
+    path('adzone/', include('adzone.urls'))
+    
     
 ]
 
-# urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-# urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
