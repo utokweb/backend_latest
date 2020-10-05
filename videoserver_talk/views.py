@@ -279,6 +279,7 @@ class FollowingGetViewSet(APIView,CustomPagination3):
         results = self.paginate_queryset(post, request, view=self)
         serializer = FollowerSerializer(results,many=True)
         #for f in serializer.data:
+	#test
         for f in serializer.data:
             
             try:
