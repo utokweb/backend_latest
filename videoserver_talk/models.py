@@ -37,6 +37,9 @@ class PhoneNumber(models.Model):
     age = models.IntegerField(default=0,blank=True)
     birthDate = models.DateField(auto_created=False,blank=True,null=True)
 
+    def __str__(self):
+        return '%s' % (self.user.username)
+
     
     #birthdDate = models.DateField(auto_created = True,blank=True)
 class Notification(models.Model):

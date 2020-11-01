@@ -199,6 +199,12 @@ class FileUploadViewSet(APIView):
             res = dict(fileSerializer.data)
             username = User.objects.get(id=res['owner'])
             serialize_data = fileSerializer.data
+            
+            try:
+                music = MusicTracks.objects.filter(id=serialize_data['musicTrack']).values()
+                serialize_data.update({"musicTrack":music[0]})
+            except Exception as identifier:
+                pass
             serialize_data.update({"owner":username.username})
             return Response(serialize_data, status=status.HTTP_201_CREATED)
         return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -236,12 +242,16 @@ class NotificationViewSet(APIView,CustomPagination3):
         results = self.paginate_queryset(notification, request, view=self)
         serializer = NotificationSerializer(results,many=True)
         for f in serializer.data:
+            
             profile_pic=PhoneNumber.objects.get(user_id=f['fromId'])
             profilePic = str(profile_pic.profilePic)
-            if profile_pic:
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+            print(profilePic)
+            
+            if profilePic=="":
+                print("fdfdfdf")
+                f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
-                f.update({"profilePic":"","username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
         
 
         return self.get_paginated_response(serializer.data)
@@ -261,10 +271,10 @@ class FollowerGetViewSet(APIView,CustomPagination3):
             profile_pic=PhoneNumber.objects.get(user=f['followerId'])
             profilePic = str(profile_pic.profilePic)
             print(profilePic)
-            if profile_pic:
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+            if profilePic=="":
+                f.update({"profilePic":None,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
-                f.update({"profilePic":"","username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
         
         return self.get_paginated_response(serializer.data)
         
@@ -286,10 +296,10 @@ class FollowingGetViewSet(APIView,CustomPagination3):
                 profile_pic=PhoneNumber.objects.get(user=f['followingId'])
                 profilePic = str(profile_pic.profilePic)
                 print(profilePic)
-                if profilePic:
-                    f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                if profilePic=="":
+                    f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
                 else:
-                    f.update({"profilePic":"","username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                    f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             except PhoneNumber.DoesNotExist:
                 pass
 
@@ -336,9 +346,12 @@ class UserVideoViewSet(APIView,CustomPagination):
         
         serializer = FileUploadSerializer2(results,many=True)
         for f in serializer.data:
-        	profile_pic=PhoneNumber.objects.get(user=pk)
-        	profilePic = str(profile_pic.profilePic)
-        	f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":pk})
+            profile_pic=PhoneNumber.objects.get(user=pk)
+            profilePic = str(profile_pic.profilePic)
+            if profilePic=="":
+                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":pk})
+            else:
+                f.update({"profilePic":None,"user_id":pk})
 
         #pagination_class = StandardResultsSetPagination
 
@@ -368,10 +381,13 @@ class Timeline(APIView,CustomPagination2):
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:
 
-        	user_id = User.objects.get(username=f['owner'])
-        	profile_pic=PhoneNumber.objects.get(user=user_id)
-        	profilePic = str(profile_pic.profilePic)
-        	f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+            user_id = User.objects.get(username=f['owner'])
+            profile_pic=PhoneNumber.objects.get(user=user_id)
+            profilePic = str(profile_pic.profilePic)
+            if profilePic=="":
+        	    f.update({"profilePic":None,"user_id":user_id.id})
+            else:
+                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
         return self.get_paginated_response(serializer.data)
 
 class TimelineFollowing(APIView,CustomPagination2):
@@ -412,7 +428,11 @@ class TimelineFollowing(APIView,CustomPagination2):
                 user_id = User.objects.get(username=z['owner'])
                 profile_pic=PhoneNumber.objects.get(user=user_id)
                 profilePic = str(profile_pic.profilePic)
-                z.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                if profilePic=="":
+                    z.update({"profilePic":None,"user_id":user_id.id})
+                else:
+                    z.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                    
                 result.append(z)
         results = self.paginate_queryset(result, request, view=self)
         return self.get_paginated_response(result)
