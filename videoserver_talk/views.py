@@ -53,22 +53,11 @@ class UserCreate(APIView):
             user = serializer.save()
             if user:
                 PhoneNumber.objects.create(user=user,phone_number=request.data['phone_number'],fullName=request.data['full_name'])
-                # API_ENDPOINT = BASEURL+'/api/method/frappe.core.doctype.user.user.sign_up?email='+request.data['email']+'&full_name='+request.data['username']+'&redirect_to=&password='+request.data['password']+''
-                # res = requests.get(API_ENDPOINT,verify=False)
-                # print(res.text)
-                # response_data = json.loads(res.text)
+        
                 token = Token.objects.create(user=user)
                 json_res = serializer.data
                 json_res['token'] = token.key
 
-                # try:
-                #     if 'data' in response_data:
-
-                #         json_res['user'] = response_data
-                #     else:
-                #         json_res['user'] = {}
-                # except:
-                #     json_res['user'] = {}
                 user = User.objects.get(id=json_res['id'])
                 try:
                     FirebaseNotification.objects.get(user=user)
