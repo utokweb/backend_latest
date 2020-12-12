@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import PhoneNumber,MusicTracks,FileUpload,PostLike,HashTag,ViewModel,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification
+from .models import PhoneNumber,MusicTracks,FileUpload,PostLike,HashTag,ViewModel,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest
 
 
 admin.site.register(PhoneNumber)
@@ -20,5 +20,7 @@ admin.site.register(StickerId)
 admin.site.register(Notification)
 admin.site.register(FirebaseNotification)
 admin.site.register(MusicTracks)
+admin.site.register(BlockRequest)
+admin.site.register(PostReportRequest)
 
 

@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated  # <-- Here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer
+from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 import requests
@@ -13,7 +13,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 import sys
 from rest_framework.pagination import PageNumberPagination
 import django_filters
-from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification
+from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest
 import json
 from django.http import Http404
 from rest_framework import status
@@ -67,6 +67,46 @@ class UserCreate(APIView):
                 return Response(json_res, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class BlockRequests(APIView):
+    
+    def get(self, request,pk, format=None):
+        blockedUsers = BlockRequest.objects.filter(blockedBy=pk)
+        serializer = BlockRequestSerializer(blockedUsers, many=True)
+        print(serializer.data)
+        for f in serializer.data:
+            profile_pic=PhoneNumber.objects.get(user=f['blockedUser'])
+            profilePic = str(profile_pic.profilePic)
+            if profilePic=="":
+                f.update({"profilePic":None,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+            else:
+                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})        
+        return Response(serializer.data)        
+
+    def post(self, request, format=None):
+        print(request.data)
+        serializer = BlockRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            blockedBy = request.data['blockedBy']
+            blockedUser = request.data['blockedUser']
+            try:
+                #Removing Following Status for Both Users
+                FollowerModel.objects.filter(followerId=blockedBy,followingId=blockedUser).delete()
+                FollowerModel.objects.filter(followerId=blockedUser,followingId=blockedBy).delete()
+            except:
+                pass
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get_object(self,pk):
+        return BlockRequest.objects.filter(id=pk)
+
+    def delete(self, request,pk, format=None):
+        post = self.get_object(pk)
+        post.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)        
+            
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 100
@@ -197,6 +237,24 @@ class FileUploadViewSet(APIView):
             serialize_data.update({"owner":username.username})
             return Response(serialize_data, status=status.HTTP_201_CREATED)
         return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+class ReportPostViewSet(APIView):
+
+    def get(self,request,pk):
+        reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
+        serializer = PostReportSerializer(reportedPosts,many=True)
+        return Response(serializer.data)
+
+    def post(self,request,*args,**kwargs):
+        reportSerializer = PostReportSerializer(data=request.data)
+
+        if(reportSerializer.is_valid()):
+            reportSerializer.save()
+            return Response(reportSerializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(reportSerializer.errors, status=status.HTTP_400_BAD_REQUEST)        
+
+
 
 class TestUserUpload(APIView):
     #permission_classes = (IsAuthenticated,)
@@ -363,13 +421,18 @@ class EditUserUploads(APIView):
 
 class Timeline(APIView,CustomPagination2):
 
-    def get(self, request, format=None):
-        
+    def get(self, request,pk, format=None):
         fileupload = FileUpload.objects.filter(privacy="public").order_by('-created')
+        if pk != None and pk > 0 :
+            blockRequests = BlockRequest.objects.filter(blockedBy=pk)
+            userIds = blockRequests.values_list('blockedUser',flat=True)
+            # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
+            # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
+            # reportedPostIds = reportedPosts.values_list('post',flat=True)
+            fileupload = FileUpload.objects.filter(privacy="public").order_by('-created').exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
-        for f in serializer.data:
-
+        for f in serializer.data:    
             user_id = User.objects.get(username=f['owner'])
             profile_pic=PhoneNumber.objects.get(user=user_id)
             profilePic = str(profile_pic.profilePic)
@@ -625,14 +688,12 @@ class CheckFollowingStatus(APIView):
         print(userId)
         print(followingId)
         try:
-            
             status_ = FollowerModel.objects.get(followerId=userId,followingId=followingId)
             status = {"status":1}
         except FollowerModel.DoesNotExist:
             status = {"status":0}
         if status['status']==0:
             try:
-                
                 status_ = FollowerModel.objects.get(followerId=followingId,followingId=userId)
                 status = {"status":2}
             except FollowerModel.DoesNotExist:

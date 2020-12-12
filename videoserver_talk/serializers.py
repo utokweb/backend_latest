@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.authtoken.models import Token
 import requests
 import math, random 
-from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification
+from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest
 from rest_framework.fields import ListField
 
 
@@ -48,6 +48,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'username', 'email', 'password')
+
+class BlockRequestSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = BlockRequest
+        fields=('id','blockedUser','blockedBy')
+    
+        
 
 class UserLoginSerializer(serializers.ModelSerializer):
     
@@ -133,13 +141,13 @@ class FullNameSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = PhoneNumber
-        fields = ['id','phone_number','bio','fullName','profilePic','followerCount','followingCount','postCount','gender','age','birthDate','elevation']
+        fields = ['id','phone_number','bio','fullName','profilePic','followerCount','followingCount','postCount','gender','age','birthDate','elevation','contentConsent']
 
 class ProfileSerializer2(serializers.ModelSerializer):
     user = FullNameSerializer(many=False, read_only=True)
     class Meta:
         model = PhoneNumber
-        fields = ['id','fullName','profilePic','followerCount','followingCount','user','postCount','gender','age','birthDate','elevation']
+        fields = ['id','fullName','profilePic','followerCount','followingCount','user','postCount','gender','age','birthDate','elevation','contentConsent']
 
 # class Base64ImageField(serializers.ImageField):
     
@@ -178,6 +186,12 @@ class ProfileSerializer2(serializers.ModelSerializer):
 #         extension = "jpg" if extension == "jpeg" else extension
 
 #         return extension
+
+class PostReportSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PostReportRequest
+        fields=('id','post','reportedBy','reportReason')
 
 class FileUploadSerializer(serializers.ModelSerializer):
     

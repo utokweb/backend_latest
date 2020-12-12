@@ -36,10 +36,21 @@ class PhoneNumber(models.Model):
     gender = models.CharField(max_length=20, blank=True,null=False)
     age = models.IntegerField(default=0,blank=True)
     birthDate = models.DateField(auto_created=False,blank=True,null=True)
+    contentConsent = models.BooleanField(default=False,null=False,blank=False)
 
     def __str__(self):
         return '%s' % (self.user.username)
 
+class BlockRequest(models.Model):
+    blockedUser = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='blockedUser')
+    blockedBy = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='blockedBy')
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+
+    class Meta:
+        unique_together = ('blockedUser', 'blockedBy')
+        
+    def __str__(self):
+        return '%s-%s' % (self.blockedUser,self.blockedBy)                
     
     #birthdDate = models.DateField(auto_created = True,blank=True)
 class Notification(models.Model):
@@ -98,8 +109,25 @@ class FileUpload(models.Model):
     category = models.CharField(max_length=20, blank=True,null=True)
     frameId =  models.CharField(max_length=200, blank=True,null=True)
     stickerId = models.CharField(max_length=200, blank=True,null=True)
-    
+    reportsCount = models.IntegerField(default=0,null=False,blank=False)
 
+class PostReportRequest(models.Model):
+    post = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='reportedPost')
+    reportedBy = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='reportedBy')
+    reportReason = models.CharField(max_length=200,blank=False,null=False)
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+
+    class Meta:
+        unique_together = ('post', 'reportedBy')
+        
+    def __str__(self):
+        return '%s-%s' % (self.post,self.reportedBy)        
+    
+@receiver(post_save, sender=PostReportRequest, dispatch_uid="update_post_report_count")
+def update_reports(sender, instance, **kwargs):
+    postData = FileUpload.objects.get(id=instance.post.id)
+    postData.reportsCount+=1
+    postData.save()
 
 
 class PostUploadTest(models.Model):
@@ -111,6 +139,7 @@ class PostUploadTest(models.Model):
     category = models.CharField(max_length=20, blank=True,null=True)
     frameCount = models.IntegerField(default=0)
     fileSize = models.IntegerField(default=0)
+
 
 @receiver(post_save, sender=FileUpload, dispatch_uid="insert-hashtag")
 def update_hashtag(sender, instance, **kwargs):
@@ -258,6 +287,7 @@ class PostLike(models.Model):
 
     class Meta:
         unique_together = ('postId', 'user','like')
+
     def __str__(self):
         return '%s-%s' % (self.user_id,self.postId_id)
 
