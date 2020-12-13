@@ -10,7 +10,7 @@ from django.db import IntegrityError
 from django.contrib.postgres.fields import ArrayField
 import sys
 from django.db import transaction
-from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage
+from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage,DPMediaStorage,ThumbnailMediaStorage,MusicTracksStorage,VedioTracksStorage,CameraAssetStorage
 
 import firebase_admin
 from firebase_admin import credentials
@@ -28,7 +28,7 @@ class PhoneNumber(models.Model):
     phone_number = models.CharField(max_length=500, blank=True,null=True,unique=True)
     bio = models.TextField(blank=True)
     fullName = models.CharField(max_length=20, blank=True,null=False)
-    profilePic = models.ImageField(storage=PublicMediaStorage(),default="")
+    profilePic = models.ImageField(storage=DPMediaStorage(),default="")
     followerCount = models.IntegerField(default=0,blank=True)
     followingCount = models.IntegerField(default=0,blank=True)
     postCount = models.IntegerField(default=0,blank=True)
@@ -72,7 +72,7 @@ def user_directory_path(instance, filename):
     return 'user_{0}/{1}'.format(instance.owner.id, filename)
 
 class MusicTracks(models.Model):
-    musicFile = models.FileField(storage=PublicMediaStorage(),blank=True,null=True)
+    musicFile = models.FileField(storage=MusicTracksStorage(),blank=True,null=True)
     musicName = models.CharField(max_length=30, blank=True,null=True)
     metaData = models.CharField(max_length=30, blank=True,null=True)
     category= models.CharField(max_length=30, blank=True,null=True)
@@ -93,8 +93,8 @@ class FileUpload(models.Model):
     )
     created = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(User, to_field='id',on_delete=models.CASCADE)
-    datafile = models.FileField(storage=PublicMediaStorage())
-    thumbnail = models.ImageField(storage=PublicMediaStorage(),default="")
+    datafile = models.FileField(storage=VedioTracksStorage())
+    thumbnail = models.ImageField(storage=ThumbnailMediaStorage(),default="")
     description = models.TextField(blank=True)
     privacy = models.CharField(max_length=20,choices=privacy_choices,default="public")
     likeCount = models.IntegerField(default=0)
@@ -131,7 +131,7 @@ def update_reports(sender, instance, **kwargs):
 
 
 class PostUploadTest(models.Model):
-    downloadUrl = models.FileField(storage=PublicMediaStorage())
+    downloadUrl = models.FileField(storage=CameraAssetStorage())
     fileName = models.CharField(max_length=20, blank=True,null=True)
     post_format = models.CharField(max_length=20, blank=True,null=True)
     durationMs = models.IntegerField(default=0)
@@ -207,8 +207,6 @@ def update_frame(sender, instance,created,**kwargs):
                             obj.frameCount+=1
                             obj.save()
                     except Exception as e:
-
-                        print("dddddddddddddddddddddddddddd")
                         obj = FrameId(frameId=data,user=instance.owner)
                         obj.save()
                         obj = FrameId.objects.get(frameId=data)

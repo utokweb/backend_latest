@@ -80,6 +80,7 @@ class BlockRequests(APIView):
             if profilePic=="":
                 f.update({"profilePic":None,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
+                #chnage by nitesh
                 f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})        
         return Response(serializer.data)        
 
@@ -422,14 +423,14 @@ class EditUserUploads(APIView):
 class Timeline(APIView,CustomPagination2):
 
     def get(self, request,pk, format=None):
-        fileupload = FileUpload.objects.filter(privacy="public").order_by('-created')
+        fileupload = FileUpload.objects.filter(privacy="public").order_by('?')
         if pk != None and pk > 0 :
             blockRequests = BlockRequest.objects.filter(blockedBy=pk)
             userIds = blockRequests.values_list('blockedUser',flat=True)
             # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
             # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
             # reportedPostIds = reportedPosts.values_list('post',flat=True)
-            fileupload = FileUpload.objects.filter(privacy="public").order_by('-created').exclude(owner_id__in=userIds)
+            fileupload = FileUpload.objects.filter(privacy="public").order_by('?').exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    
