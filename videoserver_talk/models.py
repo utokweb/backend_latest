@@ -10,7 +10,7 @@ from django.db import IntegrityError
 from django.contrib.postgres.fields import ArrayField
 import sys
 from django.db import transaction
-from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage,DPMediaStorage,ThumbnailMediaStorage,MusicTracksStorage,VedioTracksStorage,CameraAssetStorage
+from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage,DPMediaStorage,ThumbnailMediaStorage,MusicTracksStorage,VedioTracksStorage,CameraAssetStorage,STORAGE_URL
 
 import firebase_admin
 from firebase_admin import credentials
@@ -23,6 +23,7 @@ firebase_admin.initialize_app(cred)
 def user_directory_path_profile(instance, filename):
     # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
     return 'profile_{0}/{1}'.format(instance.user.id, instance.user.username)
+    
 class PhoneNumber(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     phone_number = models.CharField(max_length=500, blank=True,null=True,unique=True)
@@ -142,8 +143,8 @@ class PostUploadTest(models.Model):
 
 
 @receiver(post_save, sender=FileUpload, dispatch_uid="insert-hashtag")
-def update_hashtag(sender, instance, **kwargs):
-    if instance.hashtag:
+def update_hashtag(sender, instance,created, **kwargs):
+    if instance.hashtag and created:
         data_tag = instance.hashtag
         data_tag = data_tag.split(",")
         for data in data_tag:
@@ -233,7 +234,6 @@ def update_frame(sender, instance,created,**kwargs):
                             obj.save()
                     except Exception as e:
 
-                        print("dddddddddddddddddddddddddddd")
                         obj = FrameId(frameId=data,user=instance.owner)
                         obj.save()
                         obj = FrameId.objects.get(frameId=data)
@@ -289,6 +289,18 @@ class PostLike(models.Model):
     def __str__(self):
         return '%s-%s' % (self.user_id,self.postId_id)
 
+@receiver(post_save, sender=PostLike, dispatch_uid="increment_like_count")
+def update_count(sender, instance, **kwargs):
+    if instance.like==1:
+        instance.postId.likeCount+=1
+        instance.postId.save()
+
+@receiver(post_delete, sender=PostLike, dispatch_uid="decrement_like_count")
+def delete_count(sender, instance, **kwargs):
+    if instance.postId.likeCount > 0:
+        instance.postId.likeCount-=1
+        instance.postId.save()        
+
 
 class SavedPost(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='postsave')
@@ -312,27 +324,12 @@ class HashTag(models.Model):
         return '%s' % (self.hashtag)
 
 
-
-@receiver(post_save, sender=PostLike, dispatch_uid="increment_like_count")
-def update_count(sender, instance, **kwargs):
-    if instance.like==1:
-        instance.postId.likeCount+=1
-        instance.postId.save()
-    else:
-        instance.postId.likeCount-=1
-
-@receiver(post_delete, sender=PostLike, dispatch_uid="decrement_like_count")
-def delete_count(sender, instance, **kwargs):
-    instance.postId.likeCount-=1
-    instance.postId.save()
-
 class ViewModel(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='postId')
     count = models.IntegerField(default=0)
 
 @receiver(post_save, sender=ViewModel, dispatch_uid="increment_view_count")
-def update_count(sender, instance, **kwargs):
-    
+def update_view_count(sender, instance, **kwargs):    
     instance.postId.viewCount+=1
     instance.postId.save()
 
@@ -352,6 +349,23 @@ def update_follower(sender, instance, **kwargs):
     userObjectFollow = PhoneNumber.objects.get(user_id=instance.followerId)
     userObjectFollow.followingCount+=1
     userObjectFollow.save()
+
+@receiver(post_save, sender=FollowerModel, dispatch_uid="update-following")
+def update_following(sender, instance, **kwargs):
+    userObjectFollowing = PhoneNumber.objects.get(user_id=instance.followingId)
+    userObjectFollowing.followerCount+=1
+    userObjectFollowing.save()
+
+@receiver(post_delete, sender=FollowerModel, dispatch_uid="update-followerq")
+def unfollow_follower(sender, instance, **kwargs):
+    userObjectFollow = PhoneNumber.objects.get(user_id=instance.followerId)    
+    userObjectFollowing = PhoneNumber.objects.get(user_id=instance.followingId)
+    if userObjectFollow.followingCount > 0:
+        userObjectFollow.followingCount-=1
+        userObjectFollow.save()
+    if userObjectFollowing.followerCount > 0:
+        userObjectFollowing.followerCount-=1
+        userObjectFollowing.save()    
     
 class FirebaseNotification(models.Model):
     user = models.ForeignKey(User,on_delete=models.PROTECT,null=True,related_name='user_fcm')
@@ -376,7 +390,7 @@ def updateFollowNotifcation(sender, instance,created,**kwargs):
                 'fromId': str(user_id),
                 'toId':str(reciever_id),
                 'types':"Follow",
-                'profilePic':'https://utokcloud.s3-accelerate.amazonaws.com/media/'+profilePic,'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
+                'profilePic':STORAGE_URL+"profile_dp/"+profilePic,'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
             },
             token=registration_token,
             
@@ -398,28 +412,6 @@ def updateFollowNotifcation(sender, instance,created,**kwargs):
 
         response = messaging.send(message)
         print(response)
-
-
-
-@receiver(post_save, sender=FollowerModel, dispatch_uid="update-following")
-def update_following(sender, instance, **kwargs):
-    userObjectFollowing = PhoneNumber.objects.get(user_id=instance.followingId)
-    userObjectFollowing.followerCount+=1
-    userObjectFollowing.save()
-
-@receiver(post_delete, sender=FollowerModel, dispatch_uid="update-followerq")
-def unfollow_follower(sender, instance, **kwargs):
-    userObjectFollow = PhoneNumber.objects.get(user_id=instance.followerId)
-    
-    userObjectFollow.followingCount-=1
-    userObjectFollow.save()
-    
-
-@receiver(post_delete, sender=FollowerModel, dispatch_uid="update-followingId")
-def unfollow_follower(sender, instance, **kwargs):
-    userObjectFollowing = PhoneNumber.objects.get(user_id=instance.followingId)
-    userObjectFollowing.followerCount-=1
-    userObjectFollowing.save()
 
 class CommentModel(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='piD')

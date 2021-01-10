@@ -43,10 +43,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'videoserver_talk',
+    'filmmee_master',
     'rest_framework',
     'rest_framework.authtoken',
     'storages',
-    'adzone'
+    'adzone',
+    'corsheaders',
     
 ]
 
@@ -66,6 +68,16 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  #CORS
+    'django.middleware.common.CommonMiddleware', #CORS
+]
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ORIGIN_WHITELIST = [
+    'http://localhost:3000',
+] # If this is used, then not need to use `CORS_ORIGIN_ALLOW_ALL = True`
+CORS_ORIGIN_REGEX_WHITELIST = [
+    'http://localhost:3000',
 ]
 
 
@@ -97,7 +109,7 @@ WSGI_APPLICATION = 'youtalk.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'youtok21sept',
+        'NAME': 'filmmee_dev' if DEBUG else 'filmmee_production',
         #youtok7sept
         'USER':'postgres',
         'PASSWORD':'Mynameis@321',
@@ -159,7 +171,7 @@ USE_S3 = os.getenv('USE_S3') == 'TRUE'
 AWS_ACCESS_KEY_ID = 'AKIASDQL7WB73VVZBQGE'
 AWS_DEFAULT_ACL = None
 AWS_SECRET_ACCESS_KEY = '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'
-AWS_STORAGE_BUCKET_NAME = 'productioncloud'
+AWS_STORAGE_BUCKET_NAME = 'utokcloud' if DEBUG else 'productioncloud'
 STATICFILES_STORAGE = 'youtalk.storage_backends.StaticStorage'
 AWS_S3_CUSTOM_DOMAIN = '%s.s3-accelerate.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 AWS_S3_OBJECT_PARAMETERS = {

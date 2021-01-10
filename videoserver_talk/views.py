@@ -31,8 +31,11 @@ from rest_framework.parsers import FileUploadParser
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import filters
 from .pagination import CustomPagination,CustomPagination2,CustomPagination3
+from youtalk.storage_backends import STORAGE_URL
+import datetime,pytz
 
 BASEURL = "http://18.220.150.215:8000"
+
 
 class HelloView(APIView):
     permission_classes = (IsAuthenticated,)             # <-- And here
@@ -57,7 +60,6 @@ class UserCreate(APIView):
                 token = Token.objects.create(user=user)
                 json_res = serializer.data
                 json_res['token'] = token.key
-
                 user = User.objects.get(id=json_res['id'])
                 try:
                     FirebaseNotification.objects.get(user=user)
@@ -81,7 +83,7 @@ class BlockRequests(APIView):
                 f.update({"profilePic":None,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
                 #chnage by nitesh
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})        
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})        
         return Response(serializer.data)        
 
     def post(self, request, format=None):
@@ -154,20 +156,16 @@ def generateOTP(request) :
 
 @api_view(['GET', 'POST','OPTIONS'])
 def check_phone_number(request):
-    
     mobile_no = request.GET['phone_number']
-    print(mobile_no)
     try:
         user = PhoneNumber.objects.get(phone_number=mobile_no)
         token = Token.objects.get(user=user.user)
-        print(user.user)
-        
-    except Exception as identifier:
+    except:
         user = None
         return Response({"user":user})
     try:
         FirebaseNotification.objects.get(user=user.user)
-    except Exception as identifier:
+    except:
         FirebaseNotification.objects.create(user=user.user)
     return Response({"user":model_to_dict(user.user),"token":model_to_dict(token)})
 
@@ -189,31 +187,32 @@ def check_username(request):
 
 class UserProfile(APIView):
     #permission_classes = (IsAuthenticated,)
-    def get_object(self, pk):
+    def get_object(self, user):
         try:
-            
-            user = User.objects.get(id=pk)
             profile_id = PhoneNumber.objects.get(user_id=user.id)
-            return PhoneNumber.objects.get(pk=profile_id.id)
+            return profile_id    
         except PhoneNumber.DoesNotExist:
             raise Http404
     
     def get(self, request, pk, format=None):
-        
-        profile = self.get_object(pk)
+        if isinstance(pk, int):
+            user = User.objects.get(id=pk)
+        else:
+            user = User.objects.get(username=pk)
+        profile = self.get_object(user)
         serializer = ProfileSerializer(profile)
-        user = User.objects.get(id=pk)
         return Response({"user_profile":serializer.data,"user_data":model_to_dict(user)})
 
     def put(self, request, pk, format=None):
-        profile = self.get_object(pk)
-        
+        if isinstance(pk, int):
+            user = User.objects.get(id=pk)
+        else:
+            user = User.objects.get(username=pk)
+        profile = self.get_object(user)
         serializer = ProfileSerializer(profile, data=request.data)
-        print(request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -299,7 +298,7 @@ class NotificationViewSet(APIView,CustomPagination3):
                 print("fdfdfdf")
                 f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
         
 
         return self.get_paginated_response(serializer.data)
@@ -322,7 +321,7 @@ class FollowerGetViewSet(APIView,CustomPagination3):
             if profilePic=="":
                 f.update({"profilePic":None,"userame":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
         
         return self.get_paginated_response(serializer.data)
         
@@ -347,7 +346,7 @@ class FollowingGetViewSet(APIView,CustomPagination3):
                 if profilePic=="":
                     f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
                 else:
-                    f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                    f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             except PhoneNumber.DoesNotExist:
                 pass
 
@@ -370,36 +369,38 @@ class UserVideoViewSet(APIView,CustomPagination):
                     if int(userId)==int(pk):
                         status_ =2
                     else:
-
                         status_= 1
                 else:
                     if int(userId)==int(pk):
                         status_ =2
                     else:
                         status_=0
-            except Exception as e:
+            except:
                 status_= 0
+
             if status_== 1:
                 return FileUpload.objects.filter(Q(privacy="public") | Q(privacy="private"),owner_id=userId).order_by('-created')
             elif status_== 0:
                 return FileUpload.objects.filter(privacy="public",owner_id=userId).order_by('-created')
             elif status_ == 2:
                 return FileUpload.objects.filter(owner_id=userId).order_by('-created')
+
         except FileUpload.DoesNotExist:
             raise Http404
 
     def get(self, request, pk, format=None):
+        userId = self.request.GET['userId']
+        user = User.objects.get(id=userId)
+        profile_data=PhoneNumber.objects.get(user__id=user.id)
         upload = self.get_object(pk)
         results = self.paginate_queryset(upload, request, view=self)
-        
         serializer = FileUploadSerializer2(results,many=True)
         for f in serializer.data:
-            profile_pic=PhoneNumber.objects.get(user=pk)
-            profilePic = str(profile_pic.profilePic)
+            profilePic = str(profile_data.profilePic)
             if profilePic=="":
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":pk})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user.id})
             else:
-                f.update({"profilePic":None,"user_id":pk})
+                f.update({"profilePic":None,"user_id":user.id})
 
         #pagination_class = StandardResultsSetPagination
 
@@ -423,14 +424,31 @@ class EditUserUploads(APIView):
 class Timeline(APIView,CustomPagination2):
 
     def get(self, request,pk, format=None):
-        fileupload = FileUpload.objects.filter(privacy="public").order_by('?')
+        # In future we need to get the timezone from client side to query the
+        # posts accordingly
+        orderBy = ["viewCount"]
+        now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
+        if now.minute <20:
+            if 21 <= now.hour <= 3:
+                orderBy = ["profId__gender"]
+            else:
+                orderBy = ["-viewCount","-created"]
+        elif 20<= now.minute <=40:
+            if 12 <= now.hour <= 15:
+                orderBy = ["created"]
+            else:
+                orderBy = ["-created"]
+                        
+        print(orderBy)
+
+        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
         if pk != None and pk > 0 :
             blockRequests = BlockRequest.objects.filter(blockedBy=pk)
             userIds = blockRequests.values_list('blockedUser',flat=True)
             # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
             # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
             # reportedPostIds = reportedPosts.values_list('post',flat=True)
-            fileupload = FileUpload.objects.filter(privacy="public").order_by('?').exclude(owner_id__in=userIds)
+            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy).exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    
@@ -440,7 +458,7 @@ class Timeline(APIView,CustomPagination2):
             if profilePic=="":
         	    f.update({"profilePic":None,"user_id":user_id.id})
             else:
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
         return self.get_paginated_response(serializer.data)
 
 class TimelineFollowing(APIView,CustomPagination2):
@@ -484,7 +502,7 @@ class TimelineFollowing(APIView,CustomPagination2):
                 if profilePic=="":
                     z.update({"profilePic":None,"user_id":user_id.id})
                 else:
-                    z.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                    z.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
                     
                 result.append(z)
         results = self.paginate_queryset(result, request, view=self)
@@ -596,7 +614,7 @@ class HashTagPostSearch(APIView):
                         username = User.objects.get(id=dict_['owner_id'])
                         elevation = PhoneNumber.objects.get(user=dict_['owner_id'])
                         profId = {"followerCount":elevation.followerCount,"followingCount":elevation.followingCount,"elevation":elevation.elevation}
-                        dict_.update({"count":str(hashtag_count.count),"owner":username.username,"user_id":dict_['owner_id'],"code":search,"datafile":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+dict_['datafile'],"thumbnail":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+dict_['thumbnail'],"latitude":str(dict_['latitude']),"longitude":str(dict_['longitude']),'profId':profId})
+                        dict_.update({"count":str(hashtag_count.count),"owner":username.username,"user_id":dict_['owner_id'],"code":search,"datafile":STORAGE_URL+"upload_vedio/"+dict_['datafile'],"thumbnail":STORAGE_URL+"upload_thumbnail/"+dict_['thumbnail'],"latitude":str(dict_['latitude']),"longitude":str(dict_['longitude']),'profId':profId})
                         l.append(dict_)         
             except Exception as identifier:
                 pass
@@ -652,7 +670,7 @@ class TopTrendingPostApiSet(APIView):
                 user_id = User.objects.get(username=f['owner'])
                 profile_pic=PhoneNumber.objects.get(user=user_id)
                 profilePic = str(profile_pic.profilePic)
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
         return Response(serializer.data)
 
 class TopTrendingHashApiSet(APIView):
@@ -669,7 +687,7 @@ class TopTrendingHashApiSet(APIView):
                 user_id = User.objects.get(username=f['owner'])
                 profile_pic=PhoneNumber.objects.get(user=user_id)
                 profilePic = str(profile_pic.profilePic)
-                f.update({"profilePic":"https://utokcloud.s3-accelerate.amazonaws.com/media/"+profilePic,"user_id":user_id.id})
+                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
             dict_ = {hashtags['hashtag']:serializer_data.data}
             l.update(dict_)
         return Response(l)

@@ -6,6 +6,7 @@ urlpatterns = [
     path('hello/', views.HelloView.as_view(), name='hello'),
     path(r'api/users', views.UserCreate.as_view(), name='account-create'),
     path(r'api/userProfile/<int:pk>/', views.UserProfile.as_view(), name='user-profile'),
+    path(r'api/userProfile/<str:pk>/', views.UserProfile.as_view(), name='user-profile-username'),
     path(r'api/useruploads/<int:pk>/', views.UserVideoViewSet.as_view(), name='user-profile'),
     path(r'api/postDelete/<int:pk>/', views.DeletePostAPIView.as_view(), name='user-post-delete'),
     path(r'api/timeline/removePostLike/<int:pk>/', views.UserPostLikeUpdate.as_view(), name='user-like-update'),

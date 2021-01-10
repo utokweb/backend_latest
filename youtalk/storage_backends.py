@@ -1,6 +1,8 @@
 from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
+from . import settings
 
+STORAGE_URL = "https://utokcloud.s3.ap-south-1.amazonaws.com/media/" if settings.DEBUG else 'https://productioncloud.s3-accelerate.amazonaws.com/media/'
 
 class StaticStorage(S3Boto3Storage):
     location = 'static'
