@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated  # <-- Here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer
+from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 import requests
@@ -13,7 +13,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 import sys
 from rest_framework.pagination import PageNumberPagination
 import django_filters
-from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest
+from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost
 import json
 from django.http import Http404
 from rest_framework import status
@@ -34,11 +34,23 @@ from .pagination import CustomPagination,CustomPagination2,CustomPagination3
 from youtalk.storage_backends import STORAGE_URL
 import datetime,pytz
 
-BASEURL = "http://18.220.150.215:8000"
+VERSION = 13 #Refers to Application Version Code
+VERSION_STRING = "1.1.2"
+STRICT = False #If True, Application won't proceed without user Updating the Application to Latest Build
+
+
+@api_view(['GET'])
+def checkApplicationVersion(request):
+    return Response({
+        "version_code":VERSION,
+        "version_string":VERSION_STRING,
+        "strict":STRICT
+    })
+        
 
 
 class HelloView(APIView):
-    permission_classes = (IsAuthenticated,)             # <-- And here
+    permission_classes = (IsAuthenticated,) 
 
     def get(self, request):
         content = {'message': 'Hello, World!'}
@@ -221,22 +233,65 @@ class FileUploadViewSet(APIView):
     parser_classes = (MultiPartParser, FormParser,)
 
     def post(self, request, *args, **kwargs):
-        
         fileSerializer = FileUploadSerializer(data=request.data)
         if fileSerializer.is_valid():
             fileSerializer.save()
             res = dict(fileSerializer.data)
             username = User.objects.get(id=res['owner'])
             serialize_data = fileSerializer.data
-            
+        
             try:
                 music = MusicTracks.objects.filter(id=serialize_data['musicTrack']).values()
                 serialize_data.update({"musicTrack":music[0]})
             except Exception as identifier:
                 pass
             serialize_data.update({"owner":username.username})
+
+            #Adding an OriginialAudioPost entry ( if Applicable )
+            try:
+                originalPost = request.data['originalAudioSource']
+                if originalPost is not None:
+                    usingPostOwner = request.data['owner']
+                    usingPost = serialize_data['id']
+                    originalAudioSerializer = OriginalAudioPostSerializer(data={'originalPost':originalPost,'usingPost':usingPost,'usingPostOwner':usingPostOwner})
+                    if originalAudioSerializer.is_valid():
+                        originalAudioSerializer.save()
+                        originalPostData = FileUpload.objects.get(id=originalPost)
+                        originalPostData.originalAudioUsage += 1
+                        originalPostData.save()
+                    else:
+                        print(originalAudioSerializer.errors)    
+            except Exception as e:
+                print(e)
+                pass                                    
+
             return Response(serialize_data, status=status.HTTP_201_CREATED)
         return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+class OriginalAudioPostView(APIView,CustomPagination2):
+    def get(self,request,pk):
+        try:
+            originalAudioPosts = OriginalAudioPost.objects.filter(originalPost__id=pk).order_by('-created')
+            results = self.paginate_queryset(originalAudioPosts, request, view=self)
+            serializer = OriginalAudioPostSerializer(results,many=True)
+            for post in serializer.data:
+                postData = FileUpload.objects.get(id=post['usingPost'])
+                postSerializer = FileUploadSerializer2(postData)
+                post.update({"usingPost":postSerializer.data})
+            return self.get_paginated_response(serializer.data)
+        except Exception as e:
+            print(e)    
+        return Response({"results":[],"count":0})
+
+    def post(self,request):
+        serializerData = OriginalAudioPostSerializer(data=request.data)       
+        if serializerData.is_valid():
+            serializerData.save()
+            return Response({"status":0,"data":serializerData.data}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({"status":1,"errors":serializerData.errors}, status=status.HTTP_400_BAD_REQUEST)        
+
+
         
 class ReportPostViewSet(APIView):
 
@@ -438,8 +493,6 @@ class Timeline(APIView,CustomPagination2):
                 orderBy = ["created"]
             else:
                 orderBy = ["-created"]
-                        
-        print(orderBy)
 
         fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
         if pk != None and pk > 0 :

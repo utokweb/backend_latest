@@ -83,7 +83,7 @@ class MusicTracks(models.Model):
     albumArt = models.FileField(storage=PublicMediaStorage(),blank=True,null=True)
     created = models.DateTimeField(auto_now_add=True)
     popularity = models.IntegerField(null=True,blank=False,default=0.00)
-    fileSize = models.IntegerField(null=True,blank=False,default=0.00)
+    fileSize = models.IntegerField(null=True,blank=False,default=0.00)          
 
 
 class FileUpload(models.Model):
@@ -111,6 +111,16 @@ class FileUpload(models.Model):
     frameId =  models.CharField(max_length=200, blank=True,null=True)
     stickerId = models.CharField(max_length=200, blank=True,null=True)
     reportsCount = models.IntegerField(default=0,null=False,blank=False)
+    originalAudioUsage = models.IntegerField(default=0,null=False,blank=False)
+
+class OriginalAudioPost(models.Model):
+    originalPost = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='originalPost')
+    usingPostOwner = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='usingPostOwner')
+    usingPost = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='usingPost')
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+        
+    def __str__(self):
+        return '%s-%s' % (self.originalPost,self.usingPost)      
 
 class PostReportRequest(models.Model):
     post = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='reportedPost')

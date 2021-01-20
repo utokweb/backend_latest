@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.authtoken.models import Token
 import requests
 import math, random 
-from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest
+from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost
 from rest_framework.fields import ListField
 
 
@@ -127,6 +127,13 @@ class MusicSerializer(serializers.ModelSerializer):
     class Meta:
         model = MusicTracks
         fields=['id','musicFile','musicName','metaData','category','genre','duration','popularityCount','albumArt','created','popularity','fileSize']
+        
+class BlockRequestSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = BlockRequest
+        fields=('id','blockedUser','blockedBy')  
+
 
 class FullNameSerializer(serializers.ModelSerializer):
     class Meta:
@@ -197,7 +204,7 @@ class FileUploadSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = FileUpload
-        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId']    
+        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']    
 
 class TestPostSerializer(serializers.ModelSerializer):
     class Meta:
@@ -220,11 +227,13 @@ class FileUploadSerializer2(serializers.ModelSerializer):
 
     class Meta:
         model = FileUpload
-        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId']
+        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']
 
-  
+class OriginalAudioPostSerializer(serializers.ModelSerializer):
 
-
+    class Meta:
+        model = OriginalAudioPost
+        fields=('id','originalPost','usingPostOwner','usingPost','created')    
 
 class UserSearchSerializer(serializers.ModelSerializer):
     user = FullNameSerializer(many=False, read_only=True)

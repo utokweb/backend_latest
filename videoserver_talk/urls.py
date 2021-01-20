@@ -11,6 +11,8 @@ urlpatterns = [
     path(r'api/postDelete/<int:pk>/', views.DeletePostAPIView.as_view(), name='user-post-delete'),
     path(r'api/timeline/removePostLike/<int:pk>/', views.UserPostLikeUpdate.as_view(), name='user-like-update'),
     path(r'api/timeline/upload/', views.FileUploadViewSet.as_view(), name='upload-video'),
+    path(r'api/timeline/originalAudioPosts/<int:pk>/',views.OriginalAudioPostView.as_view(),name='get-original-audio-posts'),
+    path(r'api/timeline/createOriginalAudioPost/',views.OriginalAudioPostView.as_view(),name='create-original-audio-post'),
     path(r'api/timeline/updateViewCount/', views.ViewSetApiView.as_view(), name='update-view-count'),
     path(r'api/timeline/postLike/', views.PostLikes.as_view(), name='post-like'),
     path(r'api/timeline/hashTagPostSearch/', views.HashTagPostSearch.as_view(),name='user-hash'),
@@ -65,5 +67,6 @@ urlpatterns = [
     url(r'^generateOTP/',views.generateOTP,name='generateOTP'),
     url(r'^checkPhoneNumber/',views.check_phone_number,name='check_phone_number'),
     url(r'^checkUserName/',views.check_username,name='check_username'),
+    url(r'^checkApplicationVersion/',views.checkApplicationVersion,name='check_username'),
     
 ]
