@@ -34,8 +34,8 @@ from .pagination import CustomPagination,CustomPagination2,CustomPagination3
 from youtalk.storage_backends import STORAGE_URL
 import datetime,pytz
 
-VERSION = 13 #Refers to Application Version Code
-VERSION_STRING = "1.1.2"
+VERSION = 16 #Refers to Application Version Code
+VERSION_STRING = "1.1.6"
 STRICT = False #If True, Application won't proceed without user Updating the Application to Latest Build
 
 
@@ -651,27 +651,44 @@ class ViewSetApiView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class HashTagPostSearch(APIView):
+class HashTagPostSearch(APIView,CustomPagination2):
+    # def get(self, request, format=None):
+    #     l = []
+    #     fileupload = FileUpload.objects.filter(privacy="public").values()
+    #     search = request.GET['search']
+    #     for f in fileupload:
+    #         list_ = f['hashtag']
+    #         list_1 = list_.split(",")
+    #         try:
+    #             for z in list_1:
+    #                 if search == z:
+    #                     dict_ = f
+    #                     hashtag_count = HashTag.objects.get(hashtag=search)
+    #                     username = User.objects.get(id=dict_['owner_id'])
+    #                     elevation = PhoneNumber.objects.get(user=dict_['owner_id'])
+    #                     profId = {"followerCount":elevation.followerCount,"followingCount":elevation.followingCount,"elevation":elevation.elevation}
+    #                     dict_.update({"count":str(hashtag_count.count),"owner":username.username,"user_id":dict_['owner_id'],"code":search,"datafile":STORAGE_URL+"upload_vedio/"+dict_['datafile'],"thumbnail":STORAGE_URL+"upload_thumbnail/"+dict_['thumbnail'],"latitude":str(dict_['latitude']),"longitude":str(dict_['longitude']),'profId':profId})
+    #                     l.append(dict_)         
+    #         except Exception as identifier:
+    #             pass
+    #     return Response(l)
+
     def get(self, request, format=None):
-        l = []
-        fileupload = FileUpload.objects.filter(privacy="public").values()
         search = request.GET['search']
-        for f in fileupload:
-            list_ = f['hashtag']
-            list_1 = list_.split(",")
+        uploads = FileUpload.objects.filter(privacy="public",hashtag__contains=search).order_by("-created")[:100]
+        posts = uploads.values()
+        hashtag_count = HashTag.objects.get(hashtag=search)
+        l = []
+        for f in posts:
             try:
-                for z in list_1:
-                    if search == z:
-                        dict_ = f
-                        hashtag_count = HashTag.objects.get(hashtag=search)
-                        username = User.objects.get(id=dict_['owner_id'])
-                        elevation = PhoneNumber.objects.get(user=dict_['owner_id'])
-                        profId = {"followerCount":elevation.followerCount,"followingCount":elevation.followingCount,"elevation":elevation.elevation}
-                        dict_.update({"count":str(hashtag_count.count),"owner":username.username,"user_id":dict_['owner_id'],"code":search,"datafile":STORAGE_URL+"upload_vedio/"+dict_['datafile'],"thumbnail":STORAGE_URL+"upload_thumbnail/"+dict_['thumbnail'],"latitude":str(dict_['latitude']),"longitude":str(dict_['longitude']),'profId':profId})
-                        l.append(dict_)         
-            except Exception as identifier:
+                username = User.objects.get(id=f['owner_id'])
+                elevation = PhoneNumber.objects.get(user=f['owner_id'])
+                profId = {"followerCount":elevation.followerCount,"followingCount":elevation.followingCount,"elevation":elevation.elevation}
+                f.update({"count":str(hashtag_count.count),"owner":username.username,"user_id":f['owner_id'],"code":search,"datafile":STORAGE_URL+"upload_vedio/"+f['datafile'],"thumbnail":STORAGE_URL+"upload_thumbnail/"+f['thumbnail'],"latitude":str(f['latitude']),"longitude":str(f['longitude']),'profId':profId})
+                l.append(f)         
+            except:
                 pass
-        return Response(l)
+        return Response(l)    
 
 class FollowSetApiView(APIView):
     def post(self, request, format=None):
