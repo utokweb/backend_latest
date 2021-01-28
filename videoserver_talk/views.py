@@ -337,7 +337,7 @@ class TestUserUpload(APIView):
 
 class NotificationViewSet(APIView,CustomPagination3):
     def get_object(self,pk):
-        return Notification.objects.filter(toId=pk).order_by('-created')
+        return Notification.objects.filter(toId=pk).order_by('-created')[:50]
     
     def get(self, request, pk, format=None):
         notification = self.get_object(pk)
@@ -347,10 +347,8 @@ class NotificationViewSet(APIView,CustomPagination3):
             
             profile_pic=PhoneNumber.objects.get(user_id=f['fromId'])
             profilePic = str(profile_pic.profilePic)
-            print(profilePic)
             
             if profilePic=="":
-                print("fdfdfdf")
                 f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
             else:
                 f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
@@ -481,18 +479,19 @@ class Timeline(APIView,CustomPagination2):
     def get(self, request,pk, format=None):
         # In future we need to get the timezone from client side to query the
         # posts accordingly
-        orderBy = ["viewCount"]
-        now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
-        if now.minute <20:
-            if 21 <= now.hour <= 3:
-                orderBy = ["profId__gender"]
-            else:
-                orderBy = ["-viewCount","-created"]
-        elif 20<= now.minute <=40:
-            if 12 <= now.hour <= 15:
-                orderBy = ["created"]
-            else:
-                orderBy = ["-created"]
+        orderBy = ["-created"]
+        # orderBy = ["viewCount"]
+        # now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
+        # if now.minute <20:
+        #     if 21 <= now.hour <= 3:
+        #         orderBy = ["profId__gender"]
+        #     else:
+        #         orderBy = ["-viewCount","-created"]
+        # elif 20<= now.minute <=40:
+        #     if 12 <= now.hour <= 15:
+        #         orderBy = ["created"]
+        #     else:
+        #         orderBy = ["-created"]
 
         fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
         if pk != None and pk > 0 :
@@ -523,13 +522,10 @@ class TimelineFollowing(APIView,CustomPagination2):
         res = serializer.data
         result=[]
         for z in res:
-            
             try:
                 user_id = User.objects.get(username=z['owner'])
                 pk = user_id.id
-                print(pk)
                 status = FollowerModel.objects.filter(followerId=userId,followingId=pk)
-                
                 
                 if status:
                     if int(userId)==int(pk):
@@ -541,12 +537,10 @@ class TimelineFollowing(APIView,CustomPagination2):
                         status_ =2
                     else:
                         status_=0
-            except Exception as e:
+            except:
                 status_= 0
             
-
             if status_==0:
-                print(status_)
                 del(z)
             else:
                 user_id = User.objects.get(username=z['owner'])
@@ -713,10 +707,8 @@ class UnfollowApiSet(APIView):
 class TopUserApiSet(APIView):
      
     def get(self, request, format=None):
-        post = PhoneNumber.objects.all().order_by('-followerCount')[:5]
-        print(post)
+        post = PhoneNumber.objects.all().order_by('-followerCount')[:20]
         serializer = ProfileSerializer2(post,many=True)
-        print(serializer.data)
         return Response(serializer.data)
 
 class MostCommonFrame(APIView):
@@ -728,8 +720,8 @@ class MostCommonFrame(APIView):
 class MostCommonSticker(APIView):
     def get(self, request, format=None):
         post = StickerId.objects.all().values_list('stickerId', flat=True).order_by('-stickerCount')
-        
         return Response(post)
+
 class TopTrendingPostApiSet(APIView):
      
     def get(self, request, format=None):
