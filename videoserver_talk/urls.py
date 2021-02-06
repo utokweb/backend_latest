@@ -59,6 +59,7 @@ urlpatterns = [
     path(r'api/hashTagSearch/', views.HashTagFilter.as_view(), name='hash-tag-search'),
     path(r'api/filterAssets/', views.TestUserUpload.as_view(), name='test-upload'),
     path(r'api/getMusicTrack/', views.MusicTrackApiSet.as_view(), name='get-music'),
+    path(r'api/musicSearch/', views.music_search, name='music-search'),
     path(r'api/getPostBySize/', views.PostApiSetSortBySize.as_view(), name='get-music-size'),
     path(r'api/users/login', views.UserLoginAPIView.as_view(), name='account-login'),
     path(r'api/users/block/', views.BlockRequests.as_view(), name='user-block'),
@@ -68,5 +69,6 @@ urlpatterns = [
     url(r'^checkPhoneNumber/',views.check_phone_number,name='check_phone_number'),
     url(r'^checkUserName/',views.check_username,name='check_username'),
     url(r'^checkApplicationVersion/',views.checkApplicationVersion,name='check_username'),
+    url(r'^getVersionPromoBanner/',views.getVersionPromoBanner,name='get_version_promo_banner'),
     
 ]

@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.authtoken.models import Token
 import requests
 import math, random 
-from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost
+from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner
 from rest_framework.fields import ListField
 
 
@@ -54,8 +54,12 @@ class BlockRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlockRequest
         fields=('id','blockedUser','blockedBy')
-    
-        
+
+class PromotionBannerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PromotionBanner
+        fields=('id','promoFile','promoName','appVersion','hashtag','postsCount','valid')
 
 class UserLoginSerializer(serializers.ModelSerializer):
     

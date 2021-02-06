@@ -10,7 +10,7 @@ from django.db import IntegrityError
 from django.contrib.postgres.fields import ArrayField
 import sys
 from django.db import transaction
-from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage,DPMediaStorage,ThumbnailMediaStorage,MusicTracksStorage,VedioTracksStorage,CameraAssetStorage,STORAGE_URL
+from youtalk.storage_backends import PublicMediaStorage,PrivateMediaStorage,DPMediaStorage,ThumbnailMediaStorage,MusicTracksStorage,VedioTracksStorage,CameraAssetStorage,PromotionBannersStorage,STORAGE_URL
 
 import firebase_admin
 from firebase_admin import credentials
@@ -51,7 +51,19 @@ class BlockRequest(models.Model):
         unique_together = ('blockedUser', 'blockedBy')
         
     def __str__(self):
-        return '%s-%s' % (self.blockedUser,self.blockedBy)                
+        return '%s-%s' % (self.blockedUser,self.blockedBy)      
+
+class PromotionBanner(models.Model):
+    promoFile = models.FileField(storage=PromotionBannersStorage(),blank=True,null=True)
+    promoName = models.CharField(max_length=50,blank=True,null=True)
+    appVersion = models.IntegerField(null=False,blank=False,default=0)
+    hashtag = models.CharField(max_length=50,blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+    postsCount = models.IntegerField(null=False,blank=False,default=0)
+    valid = models.BooleanField(default=True,null=False,blank=False)
+        
+    def __str__(self):
+        return '%s - HashTag: %s - Version: %s' % (self.promoName,self.hashtag,self.appVersion)                  
     
     #birthdDate = models.DateField(auto_created = True,blank=True)
 class Notification(models.Model):

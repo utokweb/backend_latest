@@ -36,6 +36,11 @@ class MusicTracksStorage(S3Boto3Storage):
     default_acl = 'public-read'
     file_overwrite = False
 
+class PromotionBannersStorage(S3Boto3Storage):
+    location = 'media/banners'
+    default_acl = 'public-read'
+    file_overwrite = False    
+
 class VedioTracksStorage(S3Boto3Storage):
     location = 'media/upload_vedio'
     default_acl = 'public-read'

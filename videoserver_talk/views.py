@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated  # <-- Here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer
+from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer,PromotionBannerSerializer
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 import requests
@@ -13,7 +13,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 import sys
 from rest_framework.pagination import PageNumberPagination
 import django_filters
-from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost
+from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner
 import json
 from django.http import Http404
 from rest_framework import status
@@ -47,8 +47,16 @@ def checkApplicationVersion(request):
         "strict":STRICT
     })
         
-
-
+@api_view(['GET'])
+def getVersionPromoBanner(request):
+    try:
+        version = request.GET.get("v")
+        promoBanners = PromotionBanner.objects.filter(appVersion=version)
+        serializer = PromotionBannerSerializer(promoBanners, many=True)
+        return Response(serializer.data)
+    except:
+        return Response([])    
+    
 class HelloView(APIView):
     permission_classes = (IsAuthenticated,) 
 
@@ -68,7 +76,6 @@ class UserCreate(APIView):
             user = serializer.save()
             if user:
                 PhoneNumber.objects.create(user=user,phone_number=request.data['phone_number'],fullName=request.data['full_name'])
-        
                 token = Token.objects.create(user=user)
                 json_res = serializer.data
                 json_res['token'] = token.key
@@ -87,7 +94,6 @@ class BlockRequests(APIView):
     def get(self, request,pk, format=None):
         blockedUsers = BlockRequest.objects.filter(blockedBy=pk)
         serializer = BlockRequestSerializer(blockedUsers, many=True)
-        print(serializer.data)
         for f in serializer.data:
             profile_pic=PhoneNumber.objects.get(user=f['blockedUser'])
             profilePic = str(profile_pic.profilePic)
@@ -99,7 +105,6 @@ class BlockRequests(APIView):
         return Response(serializer.data)        
 
     def post(self, request, format=None):
-        print(request.data)
         serializer = BlockRequestSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -239,7 +244,18 @@ class FileUploadViewSet(APIView):
             res = dict(fileSerializer.data)
             username = User.objects.get(id=res['owner'])
             serialize_data = fileSerializer.data
-        
+
+            try:
+                # Checking if this post has a Promotional Hashtag
+                # and if yes we will be updating the Promotional Banner Post Count
+                promoBannerID = request.data['promoBannerID']
+                if promoBannerID != "-1":
+                    promoBannerData = PromotionBanner.objects.get(id=promoBannerID)
+                    promoBannerData.postsCount += 1
+                    promoBannerData.save()
+            except:
+                pass
+
             try:
                 music = MusicTracks.objects.filter(id=serialize_data['musicTrack']).values()
                 serialize_data.update({"musicTrack":music[0]})
@@ -573,11 +589,9 @@ class PostLikes(APIView):
     def get(self, request, format=None):
         postLike = PostLike.objects.filter(like=1)
         serializer = PostLikeSerializer(postLike, many=True)
-        print(serializer.data)
         return Response(serializer.data)
 
     def post(self, request, format=None):
-        print(request.data)
         serializer = PostLikeSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -759,15 +773,12 @@ class TopHashTagApiSet(APIView):
     def get(self, request, format=None):
         post = HashTag.objects.all().order_by('-count')[:10]
         serializer = HashtagSearchSerializer(post,many=True)
-        print(serializer.data)
         return Response(serializer.data)
 
 class CheckFollowingStatus(APIView):
     def get(self, request, format=None):
         userId = self.request.GET['userId']
         followingId = self.request.GET['followingId']
-        print(userId)
-        print(followingId)
         try:
             status_ = FollowerModel.objects.get(followerId=userId,followingId=followingId)
             status = {"status":1}
@@ -998,7 +1009,6 @@ class AllCommentLike(APIView):
     def get(self, request, pk, format=None):
         l = []
         post = self.get_object(pk)
-        print(post)
         serializer = CommentLikeSerializer2(post,many=True)
         for r in serializer.data:
             l.append(r['commentId'])
@@ -1063,12 +1073,10 @@ class FcmNotificationApiVIew(APIView):
 
     def put(self, request, pk, format=None):
         notification = self.get_object(pk)
-        print(request.data)
         serializer = FirebaseNotificationSerializer(notification,data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class MusicTrackApiSet(APIView):
@@ -1080,6 +1088,13 @@ class MusicTrackApiSet(APIView):
             music = MusicTracks.objects.all()
         serializers = MusicSerializer(music,many=True)
         return Response(serializers.data)
+
+@api_view(['GET'])        
+def music_search(request):
+    search = request.GET['search']
+    musicTracks = MusicTracks.objects.filter(musicName__icontains=search).order_by("-created") | MusicTracks.objects.filter(metaData__icontains=search).order_by("-created") 
+    musicSearchSerializer = MusicSerializer(musicTracks,many=True)
+    return Response(musicSearchSerializer.data) 
 
 class PostApiSetSortBySize(APIView):
     def get(self, request, format=None):
