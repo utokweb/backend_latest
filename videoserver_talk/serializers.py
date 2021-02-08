@@ -138,11 +138,10 @@ class BlockRequestSerializer(serializers.ModelSerializer):
         model = BlockRequest
         fields=('id','blockedUser','blockedBy')  
 
-
 class FullNameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id','username']
+        fields = ['id','username','email']
 
 # class FrameNameSerializer(serializers.ModelSerializer):
 #     class Meta:
@@ -158,7 +157,13 @@ class ProfileSerializer2(serializers.ModelSerializer):
     user = FullNameSerializer(many=False, read_only=True)
     class Meta:
         model = PhoneNumber
-        fields = ['id','fullName','profilePic','followerCount','followingCount','user','postCount','gender','age','birthDate','elevation','contentConsent']
+        fields = ['id','fullName','phone_number','profilePic','followerCount','followingCount','user','postCount','gender','age','birthDate','elevation','contentConsent']
+        
+class PhoneNumberExcelSerializer(serializers.ModelSerializer):
+    user = FullNameSerializer(many=False, read_only=True)
+    class Meta:
+        model = PhoneNumber
+        fields = ['id','fullName','phone_number','postCount','user']        
 
 # class Base64ImageField(serializers.ImageField):
     
