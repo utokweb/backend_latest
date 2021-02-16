@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated  # <-- Here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer,PromotionBannerSerializer
+from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer,PromotionBannerSerializer,WalletSerializer,WalletTransactionSerializer,InvitationCodeSerializer
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 import requests
@@ -13,7 +13,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 import sys
 from rest_framework.pagination import PageNumberPagination
 import django_filters
-from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner
+from .models import PhoneNumber,FileUpload,MusicTracks,PostLike,HashTag,FollowerModel,CommentModel,ReplyModel,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,StickerId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner,Wallet,WalletTransaction,InvitationCode
 import json
 from django.http import Http404
 from rest_framework import status
@@ -33,10 +33,13 @@ from rest_framework import filters
 from .pagination import CustomPagination,CustomPagination2,CustomPagination3
 from youtalk.storage_backends import STORAGE_URL
 import datetime,pytz
+from . import utils
+
 
 VERSION = 16 #Refers to Application Version Code
 VERSION_STRING = "1.1.6"
 STRICT = False #If True, Application won't proceed without user Updating the Application to Latest Build
+INVITATION_REWARD = 2
 
 
 @api_view(['GET'])
@@ -65,13 +68,10 @@ class HelloView(APIView):
         return Response(content)
 
 class UserCreate(APIView):
-    """ 
-    Creates the user. 
-    """
-    
-
     def post(self, request, format='json'):
         serializer = UserSerializer(data=request.data)
+        invitation_code = request.data['invitation_code']
+        has_invitation_code = invitation_code is not None
         if serializer.is_valid():
             user = serializer.save()
             if user:
@@ -80,9 +80,47 @@ class UserCreate(APIView):
                 json_res = serializer.data
                 json_res['token'] = token.key
                 user = User.objects.get(id=json_res['id'])
+                
+                #Creating Wallet with Transactions for Signup
+                try:
+                    initial_balance = 0
+                    if has_invitation_code:
+                        initial_balance = INVITATION_REWARD
+                    #Creating Wallet for New User with Initital Balance    
+                    newWalletSerialized = WalletSerializer(data={'user':user.id,'balance':initial_balance})
+                    if newWalletSerialized.is_valid():
+                        newWalletSerialized.save()
+                        newWallet = Wallet.objects.get(user=user.id)
+                        #Creating Transaction on Wallet for New User
+                        transactionData = {'wallet':newWallet.id,'transType':'CREDIT','transDesc':"SignUp Credit",'amount':INVITATION_REWARD,'transTo':'WALLET'}
+                        newWalletTrans = WalletTransactionSerializer(data=transactionData)
+                        if newWalletTrans.is_valid():
+                            newWalletTrans.save()
+                    if has_invitation_code:
+                        try:
+                            #Updating Invitation Code Data for the User who
+                            #Invited
+                            invitationCodeData = InvitationCode.objects.get(code=invitation_code)
+                            invitationCodeData.timesUsed += 1
+                            invitationCodeData.save()
+                            #Updating Wallet of User who Invited
+                            invOwnerWallet = Wallet.objects.get(user=invitationCodeData.user)
+                            invOwnerWallet.balance += INVITATION_REWARD
+                            invOwnerWallet.save()
+                            #Adding Transaction on Wallet of User who Invited
+                            transactionData.update({'wallet':invOwnerWallet.id,'transDesc':"SignUp Credit for "+user.username})
+                            ownerTransSerializer = WalletTransactionSerializer(data=transactionData)
+                            if ownerTransSerializer.is_valid():
+                                ownerTransSerializer.save()
+                        except (InvitationCode.DoesNotExist,Wallet.DoesNotExist):
+                            pass    
+                except:
+                    pass    
+
+                #Creating Firebase Notification with User Signup
                 try:
                     FirebaseNotification.objects.get(user=user)
-                except Exception as identifier:
+                except:
                     FirebaseNotification.objects.create(user=user)
 
                 return Response(json_res, status=status.HTTP_201_CREATED)
@@ -323,9 +361,111 @@ class ReportPostViewSet(APIView):
             reportSerializer.save()
             return Response(reportSerializer.data, status=status.HTTP_201_CREATED)
 
-        return Response(reportSerializer.errors, status=status.HTTP_400_BAD_REQUEST)        
+        return Response(reportSerializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+
+@api_view(['GET'])
+def checkInvitationCode(request):
+    try:
+        code = request.GET.get('code')
+        if code is not None:
+            InvitationCode.objects.get(code=code)
+            return Response({'status':0})
+        else:
+            return Response({'status':1})        
+    except InvitationCode.DoesNotExist:
+        return Response({'status':1})
 
 
+class InviationCodeViewSet(APIView):
+    def get(self,request,pk):
+        try:
+            invitationObject = InvitationCode.objects.get(user=pk)
+            serializedData = InvitationCodeSerializer(invitationObject)
+            return Response({'status':0,'data':serializedData.data})
+        except InvitationCode.DoesNotExist:
+            new_code = utils.random_alphanumeric(9)
+            invitationCodeSerialized = InvitationCodeSerializer(data={'user':pk,'code':new_code})
+            if invitationCodeSerialized.is_valid():
+                invitationCodeSerialized.save()
+                return Response({'status':0,'data':invitationCodeSerialized.data})
+            return Response({'status':1,'message':"Code Does not Exist",'errors':invitationCodeSerialized.errors})
+
+    def post(self,request,*args,**kwargs):
+        invitationCodeSerialized = InvitationCodeSerializer(data=request.data)
+        if invitationCodeSerialized.is_valid():
+            invitationCodeSerialized.save()
+            return Response(invitationCodeSerialized.data, status=status.HTTP_201_CREATED)
+        return Response(invitationCodeSerialized.errors, status=status.HTTP_400_BAD_REQUEST) 
+        
+    def put(self, request, pk, format=None):
+        invitationObject = InvitationCode.objects.get(id=pk)
+        invitationCodeSerialized = WalletSerializer(invitationObject, data=request.data)
+        if invitationCodeSerialized.is_valid():
+            invitationCodeSerialized.save()
+            return Response(invitationCodeSerialized.data,status=status.HTTP_200_OK)
+        return Response(invitationCodeSerialized.errors, status=status.HTTP_400_BAD_REQUEST)              
+        
+class WalletViewSet(APIView):
+
+    def get(self,request,pk):
+        try:
+            walletObj = Wallet.objects.get(user=pk)
+            serializedData = WalletSerializer(walletObj)
+            return Response({'status':0,'data':serializedData.data})
+        except Wallet.DoesNotExist:
+            walletSerializedData = WalletSerializer(data={'user':pk,'balance':0})
+            if walletSerializedData.is_valid():
+                walletSerializedData.save()
+                return Response({'status':0,'data':walletSerializedData.data})
+            return Response({'status':1,'message':"Wallet Does not Exist",'errors':walletSerializedData.errors})
+
+    def post(self,request,*args,**kwargs):
+        walletSerializedData = WalletSerializer(data=request.data)
+        if walletSerializedData.is_valid():
+            walletSerializedData.save()
+            return Response(walletSerializedData.data, status=status.HTTP_201_CREATED)
+        return Response(walletSerializedData.errors, status=status.HTTP_400_BAD_REQUEST) 
+        
+    def put(self, request, pk, format=None):
+        walletObj = Wallet.objects.get(id=pk)
+        phone_number = request.data['paytm_number']
+        if phone_number is not None:
+            try:
+                phoneNumberWallet = Wallet.objects.get(paytm=phone_number)
+                return Response({'status':2},status=status.HTTP_400_BAD_REQUEST)
+            except Wallet.DoesNotExist:
+                walletObj.paytm = phone_number
+                walletObj.save()
+                return Response({'status':0},status=status.HTTP_200_OK)
+        return Response({"status":1}, status=status.HTTP_400_BAD_REQUEST)                                 
+
+
+class WalletTransactionView(APIView):
+
+    def get(self,request,pk):
+        try:
+            walletTransactions = WalletTransaction.objects.filter(wallet=pk).order_by("-created")
+            serializerData = WalletTransactionSerializer(walletTransactions,many=True)
+            return Response(serializerData.data)
+        except Exception as e:
+            print(e)
+            return Response([])
+
+    def post(self,request,*args,**kwargs):
+        transactionSerialized = WalletTransactionSerializer(data=request.data)
+        if(transactionSerialized.is_valid()):
+            wallet = Wallet.objects.get(id=request.data['wallet'])
+            if request.data['transType'] == "CREDIT":
+                wallet.balance += request.data['amount']
+            elif request.data['transType'] == "DEBIT":
+                if wallet.balance >= request.data['amount']:
+                    wallet.balance -= request.data['amount']
+                else: 
+                    return Response({"status":1,"data":["Not Enough Balance to Debit"]}, status=status.HTTP_400_BAD_REQUEST) 
+            transactionSerialized.save()
+            wallet.save()
+            return Response({"status":0,"data":transactionSerialized.data}, status=status.HTTP_201_CREATED)
+        return Response({"status":1,"data":transactionSerialized.errors}, status=status.HTTP_400_BAD_REQUEST) 
 
 class TestUserUpload(APIView):
     #permission_classes = (IsAuthenticated,)
@@ -495,29 +635,28 @@ class Timeline(APIView,CustomPagination2):
     def get(self, request,pk, format=None):
         # In future we need to get the timezone from client side to query the
         # posts accordingly
-        orderBy = ["-created"]
-        
-        # orderBy = ["viewCount"]
-        # now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
-        # if now.minute <20:
-        #     if 21 <= now.hour <= 3:
-        #         orderBy = ["profId__gender"]
-        #     else:
-        #         orderBy = ["-viewCount","-created"]
-        # elif 20<= now.minute <=40:
-        #     if 12 <= now.hour <= 15:
-        #         orderBy = ["created"]
-        #     else:
-        #         orderBy = ["-created"]
+        min_date = utils.getDateAtGap(-7)
+        orderBy = ["viewCount"]
+        now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
+        if now.minute <20:
+            if 21 <= now.hour <= 3:
+                orderBy = ["profId__gender"]
+            else:
+                orderBy = ["-viewCount","-created"]
+        elif 20<= now.minute <=40:
+            if 12 <= now.hour <= 15:
+                orderBy = ["created"]
+            else:
+                orderBy = ["-created"]
 
-        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
+        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy)
         if pk != None and pk > 0 :
             blockRequests = BlockRequest.objects.filter(blockedBy=pk)
             userIds = blockRequests.values_list('blockedUser',flat=True)
             # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
             # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
             # reportedPostIds = reportedPosts.values_list('post',flat=True)
-            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy).exclude(owner_id__in=userIds)
+            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy).exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    
