@@ -34,12 +34,18 @@ from .pagination import CustomPagination,CustomPagination2,CustomPagination3
 from youtalk.storage_backends import STORAGE_URL
 import datetime,pytz
 from . import utils
+from youtalk.creds import PAYTM_ID,PAYTM_KEY,PAYTM_URL,PAYOUT_STATUS_URL,PAYTM_SUBWALLET_GUID
+from . import constants
+from paytmchecksum import PaytmChecksum
+from firebase_admin import messaging
+from youtalk import settings
 
 
-VERSION = 16 #Refers to Application Version Code
-VERSION_STRING = "1.1.6"
+VERSION = 18 #Refers to Application Version Code
+VERSION_STRING = "1.1.8"
 STRICT = False #If True, Application won't proceed without user Updating the Application to Latest Build
 INVITATION_REWARD = 2
+MIN_WALLET_THRESHOLD = 1
 
 
 @api_view(['GET'])
@@ -59,13 +65,6 @@ def getVersionPromoBanner(request):
         return Response(serializer.data)
     except:
         return Response([])    
-    
-class HelloView(APIView):
-    permission_classes = (IsAuthenticated,) 
-
-    def get(self, request):
-        content = {'message': 'Hello, World!'}
-        return Response(content)
 
 class UserCreate(APIView):
     def post(self, request, format='json'):
@@ -92,7 +91,8 @@ class UserCreate(APIView):
                         newWalletSerialized.save()
                         newWallet = Wallet.objects.get(user=user.id)
                         #Creating Transaction on Wallet for New User
-                        transactionData = {'wallet':newWallet.id,'transType':'CREDIT','transDesc':"SignUp Credit",'amount':INVITATION_REWARD,'transTo':'WALLET'}
+                        transaction_id = "ORDERID_" + utils.random_alphanumeric(14,False)
+                        transactionData = {'transID':transaction_id,'wallet':newWallet.id,'transType':constants.TRANS_TYPE_CREDIT,'transDesc':"SignUp Credit",'amount':INVITATION_REWARD,'transTo':constants.TRANS_TO_WALLET,'transStatus':constants.TRANS_STATUS_SUCCESS}
                         newWalletTrans = WalletTransactionSerializer(data=transactionData)
                         if newWalletTrans.is_valid():
                             newWalletTrans.save()
@@ -108,10 +108,23 @@ class UserCreate(APIView):
                             invOwnerWallet.balance += INVITATION_REWARD
                             invOwnerWallet.save()
                             #Adding Transaction on Wallet of User who Invited
-                            transactionData.update({'wallet':invOwnerWallet.id,'transDesc':"SignUp Credit for "+user.username})
+                            transaction_id = "ORDERID_" + utils.random_alphanumeric(14,False)
+                            transactionData.update({'transID':transaction_id,'wallet':invOwnerWallet.id,'transDesc':"SignUp Credit for "+user.username})
                             ownerTransSerializer = WalletTransactionSerializer(data=transactionData)
                             if ownerTransSerializer.is_valid():
                                 ownerTransSerializer.save()
+                            #Sending Notification to Owner  
+                            token=FirebaseNotification.objects.get(user=invitationCodeData.user)
+                            registration_token = token.token
+                            message = messaging.Message(
+                            data={
+                                'title':"Congratulations!",
+                                'message': "You have earned Referral Reward! Check your FilmMee Wallet Now!",
+                                'types':"Wallet",
+                            },
+                            token=registration_token,   
+                            )
+                            response = messaging.send(message)    
                         except (InvitationCode.DoesNotExist,Wallet.DoesNotExist):
                             pass    
                 except:
@@ -172,10 +185,6 @@ class StandardResultsSetPagination(PageNumberPagination):
     max_page_size = 1000
     
 class UserLoginAPIView(APIView):
-    """
-    Endpoint for user login. Returns authentication token on success.
-    """
-
     permission_classes = (permissions.AllowAny, )
     serializer_class = UserLoginSerializer
 
@@ -183,31 +192,8 @@ class UserLoginAPIView(APIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             userResp = serializer.data
-            
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# {
-# "username":"8872750000",
-# "password":"Rahul17@@@",
-# "email":"utalk@gmaail.com",
-# "full_name":"rsethi"
-# }
-
-@api_view(['GET', 'POST','OPTIONS'])
-def generateOTP(request) : 
-  
-    # Declare a digits variable   
-    # which stores all digits  
-    digits = "0123456789"
-    OTP = "" 
-  
-   # length of password can be chaged 
-   # by changing value in range 
-    for i in range(4) : 
-        OTP += digits[math.floor(random.random() * 10)] 
-  
-    return Response({"OTP":OTP})
 
 @api_view(['GET', 'POST','OPTIONS'])
 def check_phone_number(request):
@@ -274,6 +260,18 @@ class UserProfile(APIView):
 class FileUploadViewSet(APIView):
     #permission_classes = (IsAuthenticated,)
     parser_classes = (MultiPartParser, FormParser,)
+
+    def get(self,request,pk):
+        try:
+            fileUpload = FileUpload.objects.get(id=pk)
+            fileSerializer = FileUploadSerializer2(fileUpload)
+            return Response({'status':0,'data':fileSerializer.data})
+        except FileUpload.DoesNotExist as e:
+            print(e)
+        return Response({'status':1})
+            
+
+
 
     def post(self, request, *args, **kwargs):
         fileSerializer = FileUploadSerializer(data=request.data)
@@ -467,6 +465,72 @@ class WalletTransactionView(APIView):
             return Response({"status":0,"data":transactionSerialized.data}, status=status.HTTP_201_CREATED)
         return Response({"status":1,"data":transactionSerialized.errors}, status=status.HTTP_400_BAD_REQUEST) 
 
+@api_view(['POST'])
+def payout_to_paytm(request):
+    try:
+        wallet = request.data['wallet']
+        walletDetails = Wallet.objects.get(id=wallet)
+        number = walletDetails.paytm
+        amount = walletDetails.balance
+        if amount >= MIN_WALLET_THRESHOLD:
+            orderID = "ORDERID_"+utils.random_alphanumeric(14,False)
+            paytmParams = dict()
+            paytmParams["subwalletGuid"]      = PAYTM_SUBWALLET_GUID
+            paytmParams["orderId"]            = orderID
+            paytmParams["beneficiaryPhoneNo"] = "5555566666" if settings.DEBUG is True else number
+            paytmParams["amount"]             = "1.00" if settings.DEBUG is True else str(amount)
+            post_data = json.dumps(paytmParams)
+            checksum = PaytmChecksum.generateSignature(post_data, PAYTM_KEY)
+            x_mid      = PAYTM_ID
+            x_checksum = checksum
+            url = PAYTM_URL
+            response = requests.post(url, data = post_data, headers = {"Content-type": "application/json", "x-mid": x_mid, "x-checksum": x_checksum}).json()
+            if response['status'] != "FAILURE":
+                transactionData = {'transID':orderID,'wallet':wallet,'transType':constants.TRANS_TYPE_DEBIT,'transDesc':"Transfer to PayTM Balance",'amount':amount,'transTo':constants.TRANS_TO_PAYTM,'transStatus':constants.TRANS_STATUS_ACCEPTED}        
+                try:
+                    walletDetails.balance = 0
+                    walletDetails.save()
+                    walletTransSerializer = WalletTransactionSerializer(data=transactionData)
+                    if walletTransSerializer.is_valid():
+                        walletTransSerializer.save()
+                except:
+                    pass        
+                return Response({'status':0,'data':response})
+            else:
+                return Response({'status':1,'error':"Problem Initiating Transfer"})     
+        else:
+            return Response({'status':1,'error':"You must have a minimum balance of "+str(MIN_WALLET_THRESHOLD)+" INR to Checkout"})     
+    except Exception as e:
+        print(e)
+        return Response({'status':1,'error':"Problem Initiating Transfer"})
+
+@api_view(['GET'])
+def check_payout_status(request):
+    try:
+        orderID = request.GET.get('orderId')
+        paytmParams = dict()
+        paytmParams["orderId"] = orderID
+        post_data = json.dumps(paytmParams)
+        checksum = PaytmChecksum.generateSignature(post_data, PAYTM_KEY)
+        x_mid      = PAYTM_ID
+        x_checksum = checksum
+        url = PAYOUT_STATUS_URL
+        response = requests.post(url, data = post_data, headers = {"Content-type": "application/json", "x-mid": x_mid, "x-checksum": x_checksum}).json()
+       # print(response)
+        if response['status'] in [constants.TRANS_STATUS_SUCCESS,constants.TRANS_STATUS_PENDING,constants.TRANS_STATUS_FAIL,constants.TRANS_STATUS_CANCELLED]:
+            walletTransData = WalletTransaction.objects.get(transID=orderID)
+            walletTransData.transStatus = response['status']
+            walletTransData.save()
+            if response['status'] in [constants.TRANS_STATUS_FAIL,constants.TRANS_STATUS_CANCELLED]:
+                walletData = Wallet.objects.get(id=walletTransData.wallet.id)
+                walletData.balance = walletTransData.amount
+                walletData.save()
+        return Response({'status':0,'data':response})
+    except Exception as e:
+        print(e)
+        return Response({'status':1})
+
+
 class TestUserUpload(APIView):
     #permission_classes = (IsAuthenticated,)
     parser_classes = (MultiPartParser, FormParser,)
@@ -500,15 +564,23 @@ class NotificationViewSet(APIView,CustomPagination3):
         results = self.paginate_queryset(notification, request, view=self)
         serializer = NotificationSerializer(results,many=True)
         for f in serializer.data:
-            
-            profile_pic=PhoneNumber.objects.get(user_id=f['fromId'])
-            profilePic = str(profile_pic.profilePic)
-            
-            if profilePic=="":
-                f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
-            else:
-                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
-        
+            if f['fromId'] is not None:
+                profile_pic=PhoneNumber.objects.get(user_id=f['fromId'])
+                profilePic = str(profile_pic.profilePic)
+                if profilePic=="":
+                    f.update({"profilePic":None,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})
+                    f.update({"thumbnail":None})
+                else:
+                    f.update({"thumbnail":STORAGE_URL+"profile_dp/"+profilePic,"username":profile_pic.user.username,"fullName":profile_pic.fullName,"userId":profile_pic.user.id,"elevation":profile_pic.elevation})        
+                    f.update({"thumbnail":STORAGE_URL+"profile_dp/"+profilePic})
+            if f['postId'] is not None:        
+                postData=FileUpload.objects.get(id=f['postId'])
+                thumbnail = str(postData.thumbnail)
+                if thumbnail == "":
+                    f.update({"thumbnail":None})
+                else:
+                    f.update({"thumbnail":STORAGE_URL+"upload_thumbnail/"+thumbnail})
+
 
         return self.get_paginated_response(serializer.data)
 
@@ -725,7 +797,6 @@ class HashTagFilter(generics.ListCreateAPIView):
     search_fields = ['hashtag']
 
 class PostLikes(APIView):
-    
     def get(self, request, format=None):
         postLike = PostLike.objects.filter(like=1)
         serializer = PostLikeSerializer(postLike, many=True)
@@ -738,6 +809,47 @@ class PostLikes(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['PUT'])
+def increment_post_shares(request):
+    try:
+        post_id = request.data['postID']
+        fileData = FileUpload.objects.get(id=post_id)
+        fileData.shareCount += 1
+        fileData.save()
+
+           
+        # if fileData.shareCount in [3,10,16,40,52,61,72,85,95,100]:
+        notificationType = "PostShare"    
+        notificationMessage = "Your post has been shared more than "+ str(fileData.shareCount) + " times!"
+        try:
+            Notification.objects.filter(postId=fileData.id,types=notificationType).delete()
+        except Notification.DoesNotExist:
+            pass    
+        Notification.objects.create(toId=fileData.owner,postId=fileData,types=notificationType,message=notificationMessage)
+        token=FirebaseNotification.objects.get(user=fileData.owner)
+        registration_token = token.token
+        thumbnail = str(fileData.thumbnail)
+        hasThumbnail = thumbnail is not None and thumbnail is not ""
+        short_link = utils.get_short_link("/post_update/"+fileData.owner.username+"/"+str(fileData.id))
+        message = messaging.Message(
+            data={
+                'title':'Congratulations!',
+                'message': notificationMessage,
+                'types':notificationType,
+                'shortLink':short_link,
+                'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+            },
+            token=registration_token,   
+        )
+        response = messaging.send(message)
+        return Response({"status":0}) 
+    except Exception as e:  
+        print(e)
+        return Response({"status":1})   
+
+
+
 class UserSearch(generics.ListCreateAPIView):
     queryset = PhoneNumber.objects.all()
     serializer_class = UserSearchSerializer
@@ -748,7 +860,6 @@ class UserPostLike(APIView):
 
     def get_object(self, pk):
         try:
-            print(pk)
             return PostLike.objects.filter(user_id=pk,like=1)
         except PostLike.DoesNotExist:
             raise Http404
@@ -1205,7 +1316,6 @@ class FcmNotificationApiVIew(APIView):
         return FirebaseNotification.objects.get(user=pk)
     
     def get(self, request, pk, format=None):
-        
         notification = self.get_object(pk)
         serializer = FirebaseNotificationSerializer(notification)
         

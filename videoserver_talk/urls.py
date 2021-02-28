@@ -3,7 +3,6 @@ from . import views
 from django.conf.urls import url
 
 urlpatterns = [
-    path('hello/', views.HelloView.as_view(), name='hello'),
     path(r'api/users', views.UserCreate.as_view(), name='account-create'),
     path(r'api/userProfile/<int:pk>/', views.UserProfile.as_view(), name='user-profile'),
     path(r'api/userProfile/<str:pk>/', views.UserProfile.as_view(), name='user-profile-username'),
@@ -11,10 +10,12 @@ urlpatterns = [
     path(r'api/postDelete/<int:pk>/', views.DeletePostAPIView.as_view(), name='user-post-delete'),
     path(r'api/timeline/removePostLike/<int:pk>/', views.UserPostLikeUpdate.as_view(), name='user-like-update'),
     path(r'api/timeline/upload/', views.FileUploadViewSet.as_view(), name='upload-video'),
+    path(r'api/timeline/getPost/<int:pk>/', views.FileUploadViewSet.as_view(), name='get-post'),
     path(r'api/timeline/originalAudioPosts/<int:pk>/',views.OriginalAudioPostView.as_view(),name='get-original-audio-posts'),
     path(r'api/timeline/createOriginalAudioPost/',views.OriginalAudioPostView.as_view(),name='create-original-audio-post'),
     path(r'api/timeline/updateViewCount/', views.ViewSetApiView.as_view(), name='update-view-count'),
     path(r'api/timeline/postLike/', views.PostLikes.as_view(), name='post-like'),
+    path(r'api/timeline/incrementPostShares/', views.increment_post_shares, name='post-shares-increment'),
     path(r'api/timeline/hashTagPostSearch/', views.HashTagPostSearch.as_view(),name='user-hash'),
     path(r'api/timeline/userPostLike/<int:pk>/', views.UserPostLike.as_view(), name='user-post-like'),
     path(r'api/timeline/followUser/', views.FollowSetApiView.as_view(), name='follow-user'),
@@ -65,10 +66,16 @@ urlpatterns = [
     path(r'api/users/block/', views.BlockRequests.as_view(), name='user-block'),
     path(r'api/users/unblock/<int:pk>/', views.BlockRequests.as_view(), name='user-unblock'),
     path(r'api/blockedUsers/<int:pk>/', views.BlockRequests.as_view(), name='blocked_users'),
-    url(r'^generateOTP/',views.generateOTP,name='generateOTP'),
     url(r'^checkPhoneNumber/',views.check_phone_number,name='check_phone_number'),
     url(r'^checkUserName/',views.check_username,name='check_username'),
     url(r'^checkApplicationVersion/',views.checkApplicationVersion,name='check_username'),
     url(r'^getVersionPromoBanner/',views.getVersionPromoBanner,name='get_version_promo_banner'),
-    
+    path(r'api/invitation/getInvitationCode/<int:pk>/',views.InviationCodeViewSet.as_view(),name='get-user-inv-code'),
+    path(r'api/invitation/checkInvitationCode/',views.checkInvitationCode,name='check-inv-code'),
+    path(r'api/wallet/getUserWallet/<int:pk>/',views.WalletViewSet.as_view(),name='get-user-inv-code'),
+    path(r'api/wallet/updateUserWallet/<int:pk>/',views.WalletViewSet.as_view(),name='update-user-wallet'),
+    path(r'api/wallet/getWalletTransactions/<int:pk>/',views.WalletTransactionView.as_view(),name='get-wallet-transactions'),
+    path(r'api/wallet/createWalletTransaction/',views.WalletTransactionView.as_view(),name='create-wallet-transactions'),
+    path(r'api/wallet/paytmPayout/',views.payout_to_paytm,name='paytm-payout'),
+    path(r'api/wallet/checkPayoutStatus/',views.check_payout_status,name='check-paytm-payout-status'),
 ]

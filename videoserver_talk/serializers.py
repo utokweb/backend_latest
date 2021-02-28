@@ -5,7 +5,7 @@ from django.db.models import Q
 from rest_framework.authtoken.models import Token
 import requests
 import math, random 
-from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner
+from .models import PhoneNumber,FileUpload,PostLike,ViewModel,HashTag,FollowerModel,CommentModel,ReplyModel,MusicTracks,CommentLike,ReplyLike,SavedPost,PostUploadTest,FrameId,Notification,FirebaseNotification,BlockRequest,PostReportRequest,OriginalAudioPost,PromotionBanner,Wallet,WalletTransaction,InvitationCode,PromotionNotification
 from rest_framework.fields import ListField
 
 
@@ -53,13 +53,28 @@ class BlockRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BlockRequest
-        fields=('id','blockedUser','blockedBy')
+        fields=('id','blockedUser','blockedBy')        
 
 class PromotionBannerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PromotionBanner
         fields=('id','promoFile','promoName','appVersion','hashtag','postsCount','valid')
+        
+class InvitationCodeSerializer(serializers.ModelSerializer):    
+    class Meta:
+        model = InvitationCode
+        fields=('id','user','code','timesUsed','created')                      
+        
+class WalletSerializer(serializers.ModelSerializer):    
+    class Meta:
+        model = Wallet
+        fields=('id','user','balance','currency','paytm')
+
+class WalletTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletTransaction
+        fields=('id','transID','wallet','transType','transDesc','amount','currency','transTo','transStatus','created')            
 
 class UserLoginSerializer(serializers.ModelSerializer):
     
@@ -131,12 +146,6 @@ class MusicSerializer(serializers.ModelSerializer):
     class Meta:
         model = MusicTracks
         fields=['id','musicFile','musicName','metaData','category','genre','duration','popularityCount','albumArt','created','popularity','fileSize']
-        
-class BlockRequestSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = BlockRequest
-        fields=('id','blockedUser','blockedBy')  
 
 class FullNameSerializer(serializers.ModelSerializer):
     class Meta:
@@ -213,7 +222,7 @@ class FileUploadSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = FileUpload
-        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']    
+        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','shareCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']    
 
 class TestPostSerializer(serializers.ModelSerializer):
     class Meta:
@@ -236,7 +245,7 @@ class FileUploadSerializer2(serializers.ModelSerializer):
 
     class Meta:
         model = FileUpload
-        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']
+        fields = ['id','created','musicTrack','datafile', 'owner','description','privacy','thumbnail','likeCount','viewCount','shareCount','hashtag','commentCount','fileSize','latitude','longitude','profId','category','frameId','stickerId','originalAudioUsage']
 
 class OriginalAudioPostSerializer(serializers.ModelSerializer):
 
@@ -302,12 +311,6 @@ class FollowerSerializer(serializers.ModelSerializer):
         model = FollowerModel
         fields = ['followerId','followingId']
 
-# class ProfileSerializer3(serializers.ModelSerializer):
-#     class Meta:
-#         model = PhoneNumber
-#         fields = ['profilePic']
-
-
 class ProfileSerializer3(serializers.ModelSerializer):
     class Meta:
         model = PhoneNumber
@@ -324,7 +327,6 @@ class ReplySerializer(serializers.ModelSerializer):
 
 class ReplySerializer2(serializers.ModelSerializer):
     
-
     class Meta:
         model = ReplyModel
         fields = ['id','commentId','reply','userId','profId']
@@ -372,7 +374,12 @@ class NotificationSerializer(serializers.ModelSerializer):
     fromUsername = FullNameSerializer(many=False, read_only=True)
     class Meta:
         model = Notification
-        fields=['fromId','toId','fromUsername','types','message','created']
+        fields=['fromId','toId','fromUsername','postId','types','message','created']
+
+class PromotionNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PromotionNotification
+        fields=['title','message','postID','topic','created']        
 
 class FirebaseNotificationSerializer(serializers.ModelSerializer):
     class Meta:

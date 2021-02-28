@@ -13,6 +13,8 @@ from videoserver_talk import serializers
 from youtalk.storage_backends import STORAGE_URL
 from xlwt import Workbook 
 import datetime
+from firebase_admin import messaging
+from videoserver_talk import utils
 
 #View to Log In a Master Panel User
 @api_view(['POST'])
@@ -87,6 +89,22 @@ class Users(APIView,pagination.CustomPagination):
             print(e)    
         return Response({"results":[],"count":0})
 
+class PromotionNotificationView(APIView,pagination.CustomPagination):
+    def get(self,request):
+        try:
+            notifications = models.PromotionNotification.objects.all().order_by('-created')
+            results = self.paginate_queryset(notifications, request, view=self)
+            serializer = serializers.PromotionNotificationSerializer(results, many=True)
+            for notification in serializer.data:
+                if notification['postID'] is not None:
+                    postData = models.FileUpload.objects.get(id=notification['postID'])
+                    notification['postURL'] = STORAGE_URL+"upload_vedio/"+str(postData.datafile)
+                
+            return self.get_paginated_response(serializer.data)
+        except Exception as e:
+            print(e)    
+        return Response({"results":[],"count":0})        
+
 @api_view(['GET'])
 def search_user(request):
     try:
@@ -140,7 +158,59 @@ def update_post(request,postId):
             
     except Exception as e:
         print(e)                
-    return Response({"status":1,"message":"Problem Updating Post"})        
+    return Response({"status":1,"message":"Problem Updating Post"})  
+
+@api_view(['POST'])
+def promote_post(request):
+    try:
+        post_id = request.data["postID"]
+        title = request.data["title"]
+        body = request.data["body"]
+        fileData = models.FileUpload.objects.get(id=post_id)
+        thumbnail = str(fileData.thumbnail)
+        hasThumbnail = thumbnail is not None and thumbnail is not ""
+        short_link = utils.get_short_link("/post_promotion/"+fileData.owner.username+"/"+str(post_id))
+        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':"promotions",'postID':post_id})
+        if pnSerializer.is_valid():
+            pnSerializer.save()
+            message = messaging.Message(
+                data={
+                    'message': body,
+                    'title':title,
+                    'types':"Promo",
+                    'shortLink':short_link,
+                    'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+                },
+                condition="'promotions' in topics"   
+            )
+            response = messaging.send(message)
+            return Response({'status':0})
+    except:
+        pass       
+    return Response({'status':1})
+
+@api_view(['POST'])
+def promote_message(request):
+    try:
+        title = request.data["title"]
+        body = request.data["body"]
+        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':"promotions"})
+        if pnSerializer.is_valid():
+            pnSerializer.save()
+            message = messaging.Message(
+            data={
+                'message': body,
+                'title':title,
+                'types':"Promo",
+            },
+            condition="'promotions' in topics"   
+            )
+            response = messaging.send(message)
+            return Response({'status':0})
+    except:
+        pass
+    return Response({'status':1})         
+    
 
 
 

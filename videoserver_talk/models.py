@@ -16,6 +16,7 @@ import firebase_admin
 from firebase_admin import credentials
 import datetime
 from firebase_admin import messaging
+from . import utils
 
 cred = credentials.Certificate('fcm.json')
 firebase_admin.initialize_app(cred)
@@ -42,10 +43,42 @@ class PhoneNumber(models.Model):
     def __str__(self):
         return '%s' % (self.user.username)
 
+class InvitationCode(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    code = models.CharField(max_length=10, blank=False,null=False)
+    timesUsed = models.IntegerField(default=0,blank=False,null=False)
+    created = models.DateTimeField(auto_now_add=True,blank=False,null=False)  
+
+    def __str__(self):
+        return '%s - %s' % (self.user.username,self.code)
+
+class Wallet(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    balance = models.IntegerField(default=0,blank=False)
+    currency = models.CharField(max_length=10, blank=False,null=False,default="INR")
+    paytm = models.CharField(max_length=10,blank=True,null=True)
+
+    def __str__(self):
+        return '%s - %s' % (self.user.username,self.balance)
+
+class WalletTransaction(models.Model):
+    transID = models.CharField(default="ORDERID_",max_length=100, blank=False,null=False)
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE)
+    transType = models.CharField(max_length=100, blank=False,null=False)
+    transDesc = models.CharField(max_length=500, blank=False,null=False)
+    amount = models.IntegerField(default=0,blank=False,null=False)
+    currency = models.CharField(max_length=10, blank=False,null=False,default="INR")
+    transTo = models.CharField(max_length=100, blank=False,null=False) #Wallet,Paytm
+    created = models.DateTimeField(auto_now_add=True,blank=False,null=False)
+    transStatus = models.CharField(default="ACCEPTED",max_length=100, blank=False,null=False)
+
+    def __str__(self):
+        return '%s - %s' % (self.transType,self.amount)
+
 class BlockRequest(models.Model):
     blockedUser = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='blockedUser')
     blockedBy = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='blockedBy')
-    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True,blank=True,null=True)    
 
     class Meta:
         unique_together = ('blockedUser', 'blockedBy')
@@ -63,17 +96,7 @@ class PromotionBanner(models.Model):
     valid = models.BooleanField(default=True,null=False,blank=False)
         
     def __str__(self):
-        return '%s - HashTag: %s - Version: %s' % (self.promoName,self.hashtag,self.appVersion)                  
-    
-    #birthdDate = models.DateField(auto_created = True,blank=True)
-class Notification(models.Model):
-    fromId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='userNotification')
-    toId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='usertoNotification')
-    fromUsername = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='mainusertoNotification')
-    types = models.CharField(max_length=30,blank=True,null=True)
-    message = models.CharField(max_length=200,blank=True,null=True)
-    created = models.DateTimeField(auto_now_add=True)
-
+        return '%s - HashTag: %s - Version: %s' % (self.promoName,self.hashtag,self.appVersion)           
 
 def get_random_string(length):
     letters = string.ascii_lowercase
@@ -112,6 +135,7 @@ class FileUpload(models.Model):
     privacy = models.CharField(max_length=20,choices=privacy_choices,default="public")
     likeCount = models.IntegerField(default=0)
     viewCount = models.IntegerField(default=0)
+    shareCount = models.IntegerField(default=0)
     hashtag = models.TextField(max_length=10001, blank=True)
     commentCount = models.IntegerField(default=0)
     musicTrack = models.ForeignKey(MusicTracks, related_name='musicTrack',on_delete=models.CASCADE,blank=True,null=True)
@@ -125,6 +149,27 @@ class FileUpload(models.Model):
     reportsCount = models.IntegerField(default=0,null=False,blank=False)
     originalAudioUsage = models.IntegerField(default=0,null=False,blank=False)
 
+    #birthdDate = models.DateField(auto_created = True,blank=True)
+class Notification(models.Model):
+    fromId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='userNotification')
+    toId = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='usertoNotification')
+    fromUsername = models.ForeignKey(User,on_delete=models.CASCADE,null=True,related_name='mainusertoNotification')
+    postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=True,related_name='postIdNotification')
+    types = models.CharField(max_length=30,blank=True,null=True)
+    message = models.CharField(max_length=200,blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+
+class PromotionNotification(models.Model):
+    title = models.CharField(max_length=200,blank=False,null=False)
+    message = models.CharField(max_length=200,blank=False,null=False)
+    postID = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=True)
+    topic = models.CharField(max_length=50,blank=True,null=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return 'Title: %s - Message: %s' % (self.title,self.message)     
+  
 class OriginalAudioPost(models.Model):
     originalPost = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='originalPost')
     usingPostOwner = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='usingPostOwner')
@@ -176,7 +221,7 @@ def update_hashtag(sender, instance,created, **kwargs):
                     if obj:
                         obj.count+=1
                         obj.save()
-                except Exception as e:
+                except:
                     hash = HashTag(hashtag=data)
                     hash.save()
             except Exception as e:
@@ -189,14 +234,6 @@ def update_postcount(sender, instance,created,**kwargs):
         objProfile.postCount+=1
         objProfile.save()
 
-
-
-# @receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
-# def update_frame(sender, instance,created,**kwargs):
-#     if created:
-#         objProfile = PhoneNumber.objects.get(user=instance.owner_id)
-#         objProfile.postCount+=1
-#         objProfile.save()
 
 
 @receiver(post_delete, sender=FileUpload, dispatch_uid="delete_count")
@@ -241,33 +278,6 @@ def update_frame(sender, instance,created,**kwargs):
                     pass
         
 
-@receiver(post_save, sender=FileUpload, dispatch_uid="insert-count-sticker")
-def update_frame(sender, instance,created,**kwargs):
-    if created:
-        if instance.frameId:
-            frameTag = instance.frameId
-            frameTag = frameTag.split(",")
-            for data in frameTag:
-                try:
-                    try:
-                        obj = FrameId.objects.get(frameId=data)
-                        if obj:
-                            obj.frameCount+=1
-                            obj.save()
-                    except Exception as e:
-
-                        obj = FrameId(frameId=data,user=instance.owner)
-                        obj.save()
-                        obj = FrameId.objects.get(frameId=data)
-                        obj.frameCount+=1
-                        obj.save()
-
-                except Exception as e:
-                    print(e)
-                    pass
-
-
-
 class StickerId(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='postSticker')
     stickerId = models.IntegerField(default=0)
@@ -298,6 +308,7 @@ def update_sticker(sender, instance,created,**kwargs):
                 except Exception as e:
                     print(e)
                     pass
+
 class PostLike(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='post')
     user = models.ForeignKey(User,on_delete=models.PROTECT,null=False,related_name='user')
@@ -312,10 +323,37 @@ class PostLike(models.Model):
         return '%s-%s' % (self.user_id,self.postId_id)
 
 @receiver(post_save, sender=PostLike, dispatch_uid="increment_like_count")
-def update_count(sender, instance, **kwargs):
+def update_like_count(sender, instance, **kwargs):
     if instance.like==1:
         instance.postId.likeCount+=1
         instance.postId.save()
+        postData = instance.postId
+
+        
+        # if postData.likeCount in [3,10,16,40,52,61,72,85,95,100]:
+        notificationType = "PostLike"
+        notificationMessage = instance.user.username +" and "+str(postData.likeCount-1)+" others Liked your Post"
+        try:
+            Notification.objects.filter(postId=postData.id,types=notificationType).delete()
+        except Notification.DoesNotExist:
+            pass    
+        Notification.objects.create(toId=postData.owner,postId=postData,types=notificationType,message=notificationMessage)
+        token=FirebaseNotification.objects.get(user=postData.owner)
+        registration_token = token.token
+        thumbnail = str(postData.thumbnail)
+        hasThumbnail = thumbnail is not None and thumbnail is not ""
+        short_link = utils.get_short_link("/post_update/"+postData.owner.username+"/"+str(postData.id))
+        message = messaging.Message(
+            data={
+                'title':'Congratulations!',
+                'message': notificationMessage,
+                'shortLink':short_link,
+                'types':notificationType,
+                'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+            },
+            token=registration_token,   
+        )
+        response = messaging.send(message)
 
 @receiver(post_delete, sender=PostLike, dispatch_uid="decrement_like_count")
 def delete_count(sender, instance, **kwargs):
@@ -340,8 +378,6 @@ class HashTag(models.Model):
     count = models.IntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
 
-
-
     def __str__(self):
         return '%s' % (self.hashtag)
 
@@ -353,15 +389,13 @@ class ViewModel(models.Model):
 @receiver(post_save, sender=ViewModel, dispatch_uid="increment_view_count")
 def update_view_count(sender, instance, **kwargs):    
     instance.postId.viewCount+=1
-    instance.postId.save()
+    instance.postId.save()    
 
 class FollowerModel(models.Model):
     followerId = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='followerId')
     followingId = models.ForeignKey(User,on_delete=models.CASCADE,null=False,related_name='followingId')
     follow = models.SmallIntegerField(default=0,null=True,blank=True)
     created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
-
-
 
     class Meta:
         unique_together = ('followerId', 'followingId')
@@ -398,42 +432,33 @@ class FirebaseNotification(models.Model):
 def updateFollowNotifcation(sender, instance,created,**kwargs):
     user_id = User.objects.get(id=instance.followerId.id)
     reciever_id = User.objects.get(id=instance.followingId.id)
+    notificationType = "Follow"
     if created:
-        Notification.objects.create(fromId=user_id,toId=reciever_id,fromUsername=user_id,types="Follow",message=instance.followerId.username+" started Following You")
+        try: 
+            Notification.objects.filter(fromId=user_id,types=notificationType).delete()
+        except Notification.DoesNotExist:
+            pass        
+        Notification.objects.create(fromId=user_id,toId=reciever_id,fromUsername=user_id,types=notificationType,message=instance.followerId.username+" started Following You")
         token=FirebaseNotification.objects.get(user=reciever_id)
-        
         registration_token = token.token
         profile_pic=PhoneNumber.objects.get(user_id=user_id)
         profilePic = str(profile_pic.profilePic)
-        if profile_pic:
-            message = messaging.Message(
+        hasProfilePic = profilePic is not None and profilePic is not ""
+        message = messaging.Message(
             data={
                 'message': instance.followerId.username+" started Following You",
                 'fromId': str(user_id),
                 'toId':str(reciever_id),
-                'types':"Follow",
-                'profilePic':STORAGE_URL+"profile_dp/"+profilePic,'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
+                'types':notificationType,
+                'thumbnail':STORAGE_URL+"profile_dp/"+profilePic if hasProfilePic else "",
+                'username':profile_pic.user.username,
+                'fullName':profile_pic.fullName,
+                'userId':str(profile_pic.user.id),
+                'elevation':str(profile_pic.elevation)
             },
-            token=registration_token,
-            
-            
+            token=registration_token,   
         )
-        else:
-            message = messaging.Message(
-            data={
-                'message': instance.followerId.username+" started Following You",
-                'fromId': str(user_id),
-                'toId':str(reciever_id),
-                'types':"Follow",
-                'profilePic':"",'username':profile_pic.user.username,'fullName':profile_pic.fullName,'userId':str(profile_pic.user.id),'elevation':str(profile_pic.elevation)
-            },
-            token=registration_token,
-            
-            
-        )
-
         response = messaging.send(message)
-        print(response)
 
 class CommentModel(models.Model):
     postId = models.ForeignKey(FileUpload,on_delete=models.CASCADE,null=False,related_name='piD')
