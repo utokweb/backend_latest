@@ -69,7 +69,11 @@ def getVersionPromoBanner(request):
 class UserCreate(APIView):
     def post(self, request, format='json'):
         serializer = UserSerializer(data=request.data)
-        invitation_code = request.data['invitation_code']
+        invitation_code = None
+        try:
+            invitation_code = request.data['invitation_code']
+        except:
+            pass    
         has_invitation_code = invitation_code is not None
         if serializer.is_valid():
             user = serializer.save()
