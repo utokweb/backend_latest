@@ -330,30 +330,30 @@ def update_like_count(sender, instance, **kwargs):
         postData = instance.postId
 
         
-        # if postData.likeCount in [3,10,16,40,52,61,72,85,95,100]:
-        notificationType = "PostLike"
-        notificationMessage = instance.user.username +" and "+str(postData.likeCount-1)+" others Liked your Post"
-        try:
-            Notification.objects.filter(postId=postData.id,types=notificationType).delete()
-        except Notification.DoesNotExist:
-            pass    
-        Notification.objects.create(toId=postData.owner,postId=postData,types=notificationType,message=notificationMessage)
-        token=FirebaseNotification.objects.get(user=postData.owner)
-        registration_token = token.token
-        thumbnail = str(postData.thumbnail)
-        hasThumbnail = thumbnail is not None and thumbnail is not ""
-        short_link = utils.get_short_link("/post_update/"+postData.owner.username+"/"+str(postData.id))
-        message = messaging.Message(
-            data={
-                'title':'Congratulations!',
-                'message': notificationMessage,
-                'shortLink':short_link,
-                'types':notificationType,
-                'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
-            },
-            token=registration_token,   
-        )
-        response = messaging.send(message)
+        if postData.likeCount in [3,10,16,40,52,61,72,85,95,100]:
+            notificationType = "PostLike"
+            notificationMessage = instance.user.username +" and "+str(postData.likeCount-1)+" others Liked your Post"
+            try:
+                Notification.objects.filter(postId=postData.id,types=notificationType).delete()
+            except Notification.DoesNotExist:
+                pass    
+            Notification.objects.create(toId=postData.owner,postId=postData,types=notificationType,message=notificationMessage)
+            token=FirebaseNotification.objects.get(user=postData.owner)
+            registration_token = token.token
+            thumbnail = str(postData.thumbnail)
+            hasThumbnail = thumbnail is not None and thumbnail is not ""
+            short_link = utils.get_short_link("/post_update/"+postData.owner.username+"/"+str(postData.id))
+            message = messaging.Message(
+                data={
+                    'title':'Congratulations!',
+                    'message': notificationMessage,
+                    'shortLink':short_link,
+                    'types':notificationType,
+                    'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+                },
+                token=registration_token,   
+            )
+            response = messaging.send(message)
 
 @receiver(post_delete, sender=PostLike, dispatch_uid="decrement_like_count")
 def delete_count(sender, instance, **kwargs):

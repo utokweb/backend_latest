@@ -1,3 +1,5 @@
+from youtalk import settings
+
 TRANS_TO_WALLET = "WALLET"
 TRANS_TO_PAYTM = "PAYTM"
 
@@ -9,3 +11,5 @@ TRANS_STATUS_FAIL = "FAILURE"
 TRANS_STATUS_SUCCESS = "SUCCESS"
 TRANS_STATUS_PENDING = "PENDING"
 TRANS_STATUS_CANCELLED = "CANCELLED"
+
+SUBS_PROMOTION = "promotions_test" if settings.DEBUG is True else "promotions"

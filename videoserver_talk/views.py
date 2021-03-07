@@ -41,11 +41,11 @@ from firebase_admin import messaging
 from youtalk import settings
 
 
-VERSION = 18 #Refers to Application Version Code
-VERSION_STRING = "1.1.8"
-STRICT = False #If True, Application won't proceed without user Updating the Application to Latest Build
-INVITATION_REWARD = 2
-MIN_WALLET_THRESHOLD = 1
+VERSION = 25 #Refers to Application Version Code
+VERSION_STRING = "1.2.5"
+STRICT = True #If True, Application won't proceed without user Updating the Application to Latest Build
+INVITATION_REWARD = 5
+MIN_WALLET_THRESHOLD = 50
 
 
 @api_view(['GET'])
@@ -265,7 +265,15 @@ class FileUploadViewSet(APIView):
         try:
             fileUpload = FileUpload.objects.get(id=pk)
             fileSerializer = FileUploadSerializer2(fileUpload)
-            return Response({'status':0,'data':fileSerializer.data})
+            fileData = fileSerializer.data
+            user_id = User.objects.get(username=fileData['owner'])
+            profile_pic=PhoneNumber.objects.get(user=user_id)
+            profilePic = str(profile_pic.profilePic)
+            if profilePic=="":
+        	    fileData.update({"profilePic":None,"user_id":user_id.id})
+            else:
+                fileData.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
+            return Response({'status':0,'data':fileData})
         except FileUpload.DoesNotExist as e:
             print(e)
         return Response({'status':1})
@@ -707,7 +715,7 @@ class Timeline(APIView,CustomPagination2):
     def get(self, request,pk, format=None):
         # In future we need to get the timezone from client side to query the
         # posts accordingly
-        min_date = utils.getDateAtGap(-7)
+        min_date = utils.getDateAtGap(-70 if settings.DEBUG is True else -7)
         orderBy = ["viewCount"]
         now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
         if now.minute <20:
@@ -817,36 +825,35 @@ def increment_post_shares(request):
         fileData = FileUpload.objects.get(id=post_id)
         fileData.shareCount += 1
         fileData.save()
-
-           
-        # if fileData.shareCount in [3,10,16,40,52,61,72,85,95,100]:
-        notificationType = "PostShare"    
-        notificationMessage = "Your post has been shared more than "+ str(fileData.shareCount) + " times!"
-        try:
-            Notification.objects.filter(postId=fileData.id,types=notificationType).delete()
-        except Notification.DoesNotExist:
-            pass    
-        Notification.objects.create(toId=fileData.owner,postId=fileData,types=notificationType,message=notificationMessage)
-        token=FirebaseNotification.objects.get(user=fileData.owner)
-        registration_token = token.token
-        thumbnail = str(fileData.thumbnail)
-        hasThumbnail = thumbnail is not None and thumbnail is not ""
-        short_link = utils.get_short_link("/post_update/"+fileData.owner.username+"/"+str(fileData.id))
-        message = messaging.Message(
-            data={
-                'title':'Congratulations!',
-                'message': notificationMessage,
-                'types':notificationType,
-                'shortLink':short_link,
-                'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
-            },
-            token=registration_token,   
-        )
-        response = messaging.send(message)
+        if fileData.shareCount in [3,10,16,40,52,61,72,85,95,100]:
+            notificationType = "PostShare"    
+            notificationMessage = "Your post has been shared more than "+ str(fileData.shareCount) + " times!"
+            try:
+                Notification.objects.filter(postId=fileData.id,types=notificationType).delete()
+            except Notification.DoesNotExist:
+                pass    
+            Notification.objects.create(toId=fileData.owner,postId=fileData,types=notificationType,message=notificationMessage)
+            token=FirebaseNotification.objects.get(user=fileData.owner)
+            registration_token = token.token
+            thumbnail = str(fileData.thumbnail)
+            hasThumbnail = thumbnail is not None and thumbnail is not ""
+            short_link = utils.get_short_link("/post_update/"+fileData.owner.username+"/"+str(fileData.id))
+            message = messaging.Message(
+                data={
+                    'title':'Congratulations!',
+                    'message': notificationMessage,
+                    'types':notificationType,
+                    'shortLink':short_link,
+                    'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+                },
+                token=registration_token,   
+            )
+            response = messaging.send(message)
         return Response({"status":0}) 
     except Exception as e:  
         print(e)
-        return Response({"status":1})   
+        pass
+    return Response({"status":1})   
 
 
 

@@ -15,6 +15,7 @@ from xlwt import Workbook
 import datetime
 from firebase_admin import messaging
 from videoserver_talk import utils
+from videoserver_talk import constants
 
 #View to Log In a Master Panel User
 @api_view(['POST'])
@@ -170,7 +171,7 @@ def promote_post(request):
         thumbnail = str(fileData.thumbnail)
         hasThumbnail = thumbnail is not None and thumbnail is not ""
         short_link = utils.get_short_link("/post_promotion/"+fileData.owner.username+"/"+str(post_id))
-        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':"promotions",'postID':post_id})
+        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':constants.SUBS_PROMOTION,'postID':post_id})
         if pnSerializer.is_valid():
             pnSerializer.save()
             message = messaging.Message(
@@ -181,7 +182,7 @@ def promote_post(request):
                     'shortLink':short_link,
                     'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
                 },
-                condition="'promotions' in topics"   
+                condition="'"+constants.SUBS_PROMOTION+"' in topics"   
             )
             response = messaging.send(message)
             return Response({'status':0})
@@ -194,7 +195,7 @@ def promote_message(request):
     try:
         title = request.data["title"]
         body = request.data["body"]
-        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':"promotions"})
+        pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':constants.SUBS_PROMOTION})
         if pnSerializer.is_valid():
             pnSerializer.save()
             message = messaging.Message(
@@ -203,7 +204,7 @@ def promote_message(request):
                 'title':title,
                 'types':"Promo",
             },
-            condition="'promotions' in topics"   
+            condition="'"+constants.SUBS_PROMOTION+"' in topics"   
             )
             response = messaging.send(message)
             return Response({'status':0})
