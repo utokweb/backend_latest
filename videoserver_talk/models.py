@@ -343,9 +343,14 @@ def update_like_count(sender, instance, **kwargs):
             thumbnail = str(postData.thumbnail)
             hasThumbnail = thumbnail is not None and thumbnail is not ""
             short_link = utils.get_short_link("/post_update/"+postData.owner.username+"/"+str(postData.id))
+            title = 'Congratulations!'
             message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=notificationMessage,
+                ),
                 data={
-                    'title':'Congratulations!',
+                    'title':title,
                     'message': notificationMessage,
                     'shortLink':short_link,
                     'types':notificationType,
@@ -433,20 +438,28 @@ def updateFollowNotifcation(sender, instance,created,**kwargs):
     user_id = User.objects.get(id=instance.followerId.id)
     reciever_id = User.objects.get(id=instance.followingId.id)
     notificationType = "Follow"
+    notificationMessage = instance.followerId.username+" started Following You"
+    title = "New Follower"
     if created:
         try: 
             Notification.objects.filter(fromId=user_id,types=notificationType).delete()
         except Notification.DoesNotExist:
             pass        
-        Notification.objects.create(fromId=user_id,toId=reciever_id,fromUsername=user_id,types=notificationType,message=instance.followerId.username+" started Following You")
+        
+        Notification.objects.create(fromId=user_id,toId=reciever_id,fromUsername=user_id,types=notificationType,message=notificationMessage)
         token=FirebaseNotification.objects.get(user=reciever_id)
         registration_token = token.token
         profile_pic=PhoneNumber.objects.get(user_id=user_id)
         profilePic = str(profile_pic.profilePic)
         hasProfilePic = profilePic is not None and profilePic is not ""
         message = messaging.Message(
+            notification=messaging.Notification(
+                    title=title,
+                    body=notificationMessage,
+                ),
             data={
-                'message': instance.followerId.username+" started Following You",
+                'title':title,
+                'message': notificationMessage,
                 'fromId': str(user_id),
                 'toId':str(reciever_id),
                 'types':notificationType,

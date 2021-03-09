@@ -175,6 +175,10 @@ def promote_post(request):
         if pnSerializer.is_valid():
             pnSerializer.save()
             message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
                 data={
                     'message': body,
                     'title':title,
@@ -199,12 +203,21 @@ def promote_message(request):
         if pnSerializer.is_valid():
             pnSerializer.save()
             message = messaging.Message(
-            data={
-                'message': body,
-                'title':title,
-                'types':"Promo",
-            },
-            condition="'"+constants.SUBS_PROMOTION+"' in topics"   
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data={
+                    'message': body,
+                    'title':title,
+                    'types':"Promo",
+                },
+                # apns=messaging.APNSConfig(
+                #         headers= {
+                #             "apns-priority":"10"
+                #         }
+                # ),
+                condition="'"+constants.SUBS_PROMOTION+"' in topics"   
             )
             response = messaging.send(message)
             return Response({'status':0})

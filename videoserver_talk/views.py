@@ -120,13 +120,19 @@ class UserCreate(APIView):
                             #Sending Notification to Owner  
                             token=FirebaseNotification.objects.get(user=invitationCodeData.user)
                             registration_token = token.token
+                            title = "Congratulations!"
+                            body = "You have earned Referral Reward! Check your FilmMee Wallet Now!"
                             message = messaging.Message(
-                            data={
-                                'title':"Congratulations!",
-                                'message': "You have earned Referral Reward! Check your FilmMee Wallet Now!",
-                                'types':"Wallet",
-                            },
-                            token=registration_token,   
+                                notification=messaging.Notification(
+                                    title=title,
+                                    body=body,
+                                ),
+                                data={
+                                    'title':title,
+                                    'message': body,
+                                    'types':"Wallet",
+                                },
+                                token=registration_token,   
                             )
                             response = messaging.send(message)    
                         except (InvitationCode.DoesNotExist,Wallet.DoesNotExist):
@@ -842,9 +848,14 @@ def increment_post_shares(request):
             thumbnail = str(fileData.thumbnail)
             hasThumbnail = thumbnail is not None and thumbnail is not ""
             short_link = utils.get_short_link("/post_update/"+fileData.owner.username+"/"+str(fileData.id))
+            title = 'Congratulations!'
             message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=notificationMessage,
+                ),
                 data={
-                    'title':'Congratulations!',
+                    'title':title,
                     'message': notificationMessage,
                     'types':notificationType,
                     'shortLink':short_link,
