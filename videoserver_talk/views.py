@@ -723,21 +723,22 @@ class EditUserUploads(APIView):
 class Timeline(APIView,CustomPagination2):
 
     def get(self, request,pk, format=None):
+        orderBy = ["-created"]
         # In future we need to get the timezone from client side to query the
         # posts accordingly
         min_date = utils.getDateAtGap(-70 if settings.DEBUG is True else -7)
-        orderBy = ["viewCount"]
-        now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
-        if now.minute <20:
-            if 21 <= now.hour <= 3:
-                orderBy = ["profId__gender"]
-            else:
-                orderBy = ["-viewCount","-created"]
-        elif 20<= now.minute <=40:
-            if 12 <= now.hour <= 15:
-                orderBy = ["created"]
-            else:
-                orderBy = ["-created"]
+        # orderBy = ["viewCount"]
+        # now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
+        # if now.minute <20:
+        #     if 21 <= now.hour <= 3:
+        #         orderBy = ["profId__gender"]
+        #     else:
+        #         orderBy = ["-viewCount","-created"]
+        # elif 20<= now.minute <=40:
+        #     if 12 <= now.hour <= 15:
+        #         orderBy = ["created"]
+        #     else:
+        #         orderBy = ["-created"]
 
         fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy)
         if pk != None and pk > 0 :
@@ -757,7 +758,9 @@ class Timeline(APIView,CustomPagination2):
         	    f.update({"profilePic":None,"user_id":user_id.id})
             else:
                 f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
-        return self.get_paginated_response(serializer.data)
+        final_data = serializer.data  
+        random.shuffle(final_data)      
+        return self.get_paginated_response(final_data)
 
 class TimelineFollowing(APIView,CustomPagination2):
     def get(self, request, format=None):
