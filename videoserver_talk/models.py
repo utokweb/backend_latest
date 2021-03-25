@@ -91,6 +91,7 @@ class PromotionBanner(models.Model):
     promoName = models.CharField(max_length=50,blank=True,null=True)
     appVersion = models.IntegerField(null=False,blank=False,default=0)
     hashtag = models.CharField(max_length=50,blank=True,null=True)
+    category = models.CharField(max_length=50,blank=True,null=True)
     created = models.DateTimeField(auto_now_add=True,blank=True,null=True)
     postsCount = models.IntegerField(null=False,blank=False,default=0)
     valid = models.BooleanField(default=True,null=False,blank=False)

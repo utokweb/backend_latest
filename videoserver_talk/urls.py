@@ -70,6 +70,7 @@ urlpatterns = [
     url(r'^checkUserName/',views.check_username,name='check_username'),
     url(r'^checkApplicationVersion/',views.checkApplicationVersion,name='check_username'),
     url(r'^getVersionPromoBanner/',views.getVersionPromoBanner,name='get_version_promo_banner'),
+    url(r'^getCategoryPromoBanners/',views.getCategoryPromoBanners,name='get_version_promo_banner'),
     path(r'api/invitation/getInvitationCode/<int:pk>/',views.InviationCodeViewSet.as_view(),name='get-user-inv-code'),
     path(r'api/invitation/checkInvitationCode/',views.checkInvitationCode,name='check-inv-code'),
     path(r'api/wallet/getUserWallet/<int:pk>/',views.WalletViewSet.as_view(),name='get-user-inv-code'),

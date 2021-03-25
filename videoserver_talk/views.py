@@ -41,8 +41,8 @@ from firebase_admin import messaging
 from youtalk import settings
 
 
-VERSION = 25 #Refers to Application Version Code
-VERSION_STRING = "1.2.5"
+VERSION = 26 #Refers to Application Version Code
+VERSION_STRING = "1.2.6"
 STRICT = True #If True, Application won't proceed without user Updating the Application to Latest Build
 INVITATION_REWARD = 5
 MIN_WALLET_THRESHOLD = 50
@@ -60,11 +60,21 @@ def checkApplicationVersion(request):
 def getVersionPromoBanner(request):
     try:
         version = request.GET.get("v")
-        promoBanners = PromotionBanner.objects.filter(appVersion=version)
+        promoBanners = PromotionBanner.objects.filter(appVersion=version)[1:]
         serializer = PromotionBannerSerializer(promoBanners, many=True)
         return Response(serializer.data)
     except:
-        return Response([])    
+        return Response([])   
+
+@api_view(['GET'])
+def getCategoryPromoBanners(request):
+    try:
+        category = request.GET.get("category")
+        promoBanners = PromotionBanner.objects.filter(category=category)
+        serializer = PromotionBannerSerializer(promoBanners, many=True)
+        return Response(serializer.data)
+    except:
+        return Response([])            
 
 class UserCreate(APIView):
     def post(self, request, format='json'):
@@ -75,7 +85,13 @@ class UserCreate(APIView):
         except:
             pass    
         has_invitation_code = invitation_code is not None
-        if serializer.is_valid():
+        session_confirmation = True
+        if VERSION == 30: # Only for Version 30 as a backup for previous APIs
+            sessionID = request.data['session_id']
+            otpCode = request.data['otp_code']
+            sessionConResponse = requests.get("http://2factor.in/API/V1/4a653039-2e36-11eb-83d4-0200cd936042/ADDON_SERVICES/RPT/TSMS/"+sessionID+"")            
+            session_confirmation = "<logStatus>Valid</logStatus>" in sessionConResponse.text and otpCode in sessionConResponse.text
+        if serializer.is_valid() and session_confirmation:
             user = serializer.save()
             if user:
                 PhoneNumber.objects.create(user=user,phone_number=request.data['phone_number'],fullName=request.data['full_name'])
@@ -739,15 +755,16 @@ class Timeline(APIView,CustomPagination2):
         #         orderBy = ["created"]
         #     else:
         #         orderBy = ["-created"]
+        # created__gt=min_date
 
-        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy)
+        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
         if pk != None and pk > 0 :
             blockRequests = BlockRequest.objects.filter(blockedBy=pk)
             userIds = blockRequests.values_list('blockedUser',flat=True)
             # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
             # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
             # reportedPostIds = reportedPosts.values_list('post',flat=True)
-            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy).exclude(owner_id__in=userIds)
+            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy).exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    
@@ -1015,7 +1032,7 @@ class MostCommonSticker(APIView):
 class TopTrendingPostApiSet(APIView):
      
     def get(self, request, format=None):
-        post = FileUpload.objects.all().order_by('-viewCount')[:5]
+        post = FileUpload.objects.all().order_by('-viewCount')[:10]
         
         serializer = FileUploadSerializer2(post,many=True)
         for f in serializer.data:
@@ -1029,11 +1046,11 @@ class TopTrendingHashApiSet(APIView):
      
     def get(self, request, format=None):
         l= {}
-        hashTag = HashTag.objects.all().order_by('-count')[:3]
+        hashTag = HashTag.objects.all().order_by('-count')[:5]
         
         serializer = HashtagSearchSerializer2(hashTag,many=True)
         for hashtags in serializer.data:
-            search = FileUpload.objects.filter(hashtag__contains=hashtags['hashtag']).order_by('-viewCount')[:3]
+            search = FileUpload.objects.filter(hashtag__contains=hashtags['hashtag']).order_by('-viewCount')[:10]
             serializer_data = FileUploadSerializer2(search,many=True)
             for f in serializer_data.data:
                 user_id = User.objects.get(username=f['owner'])

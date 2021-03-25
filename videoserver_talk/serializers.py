@@ -59,7 +59,7 @@ class PromotionBannerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PromotionBanner
-        fields=('id','promoFile','promoName','appVersion','hashtag','postsCount','valid')
+        fields=('id','promoFile','promoName','category','appVersion','hashtag','postsCount','valid')
         
 class InvitationCodeSerializer(serializers.ModelSerializer):    
     class Meta:

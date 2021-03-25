@@ -199,7 +199,17 @@ def promote_message(request):
     try:
         title = request.data["title"]
         body = request.data["body"]
+        category = request.data['category']
+        print(category)
         pnSerializer = serializers.PromotionNotificationSerializer(data={'title':title,'message':body,'topic':constants.SUBS_PROMOTION})
+        notificationData = {
+                'message': body,
+                'title':title,
+                'types':"Promo",
+        }
+        if category == "trending":
+            short_link = utils.get_short_link("/trending")                
+            notificationData.update({"shortLink":short_link})
         if pnSerializer.is_valid():
             pnSerializer.save()
             message = messaging.Message(
@@ -207,11 +217,7 @@ def promote_message(request):
                     title=title,
                     body=body,
                 ),
-                data={
-                    'message': body,
-                    'title':title,
-                    'types':"Promo",
-                },
+                data=notificationData,
                 # apns=messaging.APNSConfig(
                 #         headers= {
                 #             "apns-priority":"10"
@@ -221,7 +227,8 @@ def promote_message(request):
             )
             response = messaging.send(message)
             return Response({'status':0})
-    except:
+    except Exception as e:
+        print(e)
         pass
     return Response({'status':1})         
     
