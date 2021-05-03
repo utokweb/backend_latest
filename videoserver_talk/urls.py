@@ -55,6 +55,7 @@ urlpatterns = [
     path(r'api/trendingHashPost/', views.TopTrendingHashApiSet.as_view(), name='topTrending-hash'),
     path(r'api/trendingHashTag/', views.TopHashTagApiSet.as_view(), name='hashtag-trending'),
     path(r'api/userSearch/', views.UserSearch.as_view(), name='user-search'),
+    path(r'api/usernameSearch/', views.username_search, name='username-search'),
     path(r'api/mostCommonFrame/', views.MostCommonFrame.as_view(), name='common-Frme'),
     path(r'api/mostCommonSticker/', views.MostCommonSticker.as_view(), name='common-sticker'),
     path(r'api/hashTagSearch/', views.HashTagFilter.as_view(), name='hash-tag-search'),

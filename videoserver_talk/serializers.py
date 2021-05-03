@@ -264,6 +264,11 @@ class UserSearchSerializer(serializers.ModelSerializer):
         model = PhoneNumber
         fields = ['fullName','user','profilePic','elevation','followerCount']
 
+class UsernameSearchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username','id']
+
 
 class PostsaveSerializer(serializers.ModelSerializer):
     postId = FileUploadSerializer2(many=False, read_only=True)

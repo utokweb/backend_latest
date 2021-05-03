@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated  # <-- Here
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer,PromotionBannerSerializer,WalletSerializer,WalletTransactionSerializer,InvitationCodeSerializer
+from videoserver_talk.serializers import UserSerializer,UserLoginSerializer,MusicSerializer,ProfileSerializer,FileUploadSerializer,FileUploadSerializer2,UserSearchSerializer,PostLikeSerializer,PostLikeSerializer2,ViewSetSerializer,HashtagSearchSerializer,FollowerSerializer,ProfileSerializer2,CommentSerializer,ReplySerializer,HashtagSearchSerializer2,CommentSerializer2,ReplySerializer2,CommentLikeSerializer,CommentLikeSerializer2,ReplyLikeSerializer,ReplyLikeSerializer2,PostsaveSerializer2,PostsaveSerializer,TestPostSerializer,NotificationSerializer,FirebaseNotificationSerializer,BlockRequestSerializer,PostReportSerializer,OriginalAudioPostSerializer,PromotionBannerSerializer,WalletSerializer,WalletTransactionSerializer,InvitationCodeSerializer,UsernameSearchSerializer
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 import requests
@@ -46,6 +46,7 @@ VERSION_STRING = "1.2.6"
 STRICT = True #If True, Application won't proceed without user Updating the Application to Latest Build
 INVITATION_REWARD = 5
 MIN_WALLET_THRESHOLD = 50
+PAYTM_BLOCKLIST = ["7626968921"]
 
 
 @api_view(['GET'])
@@ -304,17 +305,23 @@ class FileUploadViewSet(APIView):
             print(e)
         return Response({'status':1})
             
-
-
-
     def post(self, request, *args, **kwargs):
         fileSerializer = FileUploadSerializer(data=request.data)
+        tagged_users = []
+        try:
+            tagged_string = request.data['tagged']
+            if tagged_string is not None and tagged_string is not "":
+                tagged_users = tagged_string.split(sep=",")
+        except:
+            pass    
+
         if fileSerializer.is_valid():
             fileSerializer.save()
             res = dict(fileSerializer.data)
             username = User.objects.get(id=res['owner'])
             serialize_data = fileSerializer.data
-
+            
+                
             try:
                 # Checking if this post has a Promotional Hashtag
                 # and if yes we will be updating the Promotional Banner Post Count
@@ -331,6 +338,7 @@ class FileUploadViewSet(APIView):
                 serialize_data.update({"musicTrack":music[0]})
             except Exception as identifier:
                 pass
+
             serialize_data.update({"owner":username.username})
 
             #Adding an OriginialAudioPost entry ( if Applicable )
@@ -349,8 +357,41 @@ class FileUploadViewSet(APIView):
                         print(originalAudioSerializer.errors)    
             except Exception as e:
                 print(e)
-                pass                                    
+                pass 
 
+            for tag in tagged_users:
+                try:
+                    notificationType = "UserTag"    
+                    notificationMessage = username.username + " tagged you in a new Post!"
+                    user_data = User.objects.get(username=tag)
+                    newPost = FileUpload.objects.get(id=serialize_data['id'])
+                    Notification.objects.create(toId=user_data,postId=newPost,types=notificationType,message=notificationMessage)
+                    token=FirebaseNotification.objects.get(user=user_data.id)
+                    registration_token = token.token
+                    thumbnail = str(serialize_data['thumbnail'])
+                    hasThumbnail = thumbnail is not None and thumbnail is not ""
+                    short_link = utils.get_short_link("/post_update/"+username.username+"/"+str(serialize_data['id'])+"")
+                    title = "You've been Tagged!"
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title=title,
+                            body=notificationMessage,
+                        ),
+                        data={
+                            'title':title,
+                            'message': notificationMessage,
+                            'types':notificationType,
+                            'shortLink':short_link,
+                            'thumbnail':STORAGE_URL+"upload_thumbnail/"+thumbnail if hasThumbnail else "",
+                        },
+                        token=registration_token,   
+                    )
+                    response = messaging.send(message)
+                    
+                except Exception as e:
+                    print(e)
+                    pass    
+                        
             return Response(serialize_data, status=status.HTTP_201_CREATED)
         return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
@@ -505,6 +546,8 @@ def payout_to_paytm(request):
         wallet = request.data['wallet']
         walletDetails = Wallet.objects.get(id=wallet)
         number = walletDetails.paytm
+        if number in PAYTM_BLOCKLIST:
+            raise Exception("Your number has been restricted from Transaction")
         amount = walletDetails.balance
         if amount >= MIN_WALLET_THRESHOLD:
             orderID = "ORDERID_"+utils.random_alphanumeric(14,False)
@@ -768,13 +811,16 @@ class Timeline(APIView,CustomPagination2):
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    
-            user_id = User.objects.get(username=f['owner'])
-            profile_pic=PhoneNumber.objects.get(user=user_id)
-            profilePic = str(profile_pic.profilePic)
-            if profilePic=="":
-        	    f.update({"profilePic":None,"user_id":user_id.id})
-            else:
-                f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
+            try:
+                user_id = User.objects.get(username=f['owner'])
+                profile_pic=PhoneNumber.objects.get(user=user_id)
+                profilePic = str(profile_pic.profilePic)
+                if profilePic=="":
+                    f.update({"profilePic":None,"user_id":user_id.id})
+                else:
+                    f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
+            except:
+                pass        
         final_data = serializer.data  
         random.shuffle(final_data)      
         return self.get_paginated_response(final_data)
@@ -897,6 +943,26 @@ class UserSearch(generics.ListCreateAPIView):
     serializer_class = UserSearchSerializer
     filter_backends = (filters.SearchFilter,)
     search_fields = ['fullName','user__username']
+
+@api_view(["GET"])
+def username_search(request):
+    try:
+        q = request.GET['q']
+        users = User.objects.filter(username__contains=q)[:5]
+        users_serializer = UsernameSearchSerializer(users,many=True)
+        l=[]
+        for user in users_serializer.data:
+            userData = {"username":user['username']}
+            phoneNumber = PhoneNumber.objects.get(user=user['id'])
+            if phoneNumber.profilePic is not None and phoneNumber.profilePic is not "":
+                profilePic = str(phoneNumber.profilePic)
+                userData.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic})
+            l.append(userData)                    
+        return Response(l)
+    except Exception as e:
+        print(e)
+        return Response([])    
+
 
 class UserPostLike(APIView):
 

@@ -75,9 +75,11 @@ MIDDLEWARE = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
+    'http://3.129.93.58:1919',
 ] # If this is used, then not need to use `CORS_ORIGIN_ALLOW_ALL = True`
 CORS_ORIGIN_REGEX_WHITELIST = [
     'http://localhost:3000',
+    'http://3.129.93.58:1919',
 ]
 
 
@@ -109,7 +111,7 @@ WSGI_APPLICATION = 'youtalk.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'filmmee_dev' if DEBUG else 'filmmee_production',
+        'NAME': 'testfilm' if DEBUG else 'filmmee_production',
         #youtok7sept
         'USER':'postgres',
         'PASSWORD':'Mynameis@321',
