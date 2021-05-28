@@ -27,7 +27,7 @@ SECURE_SSL_REDIRECT = False
 SECRET_KEY = 'zd%m4rguxgb_7fy+!jyloglw-e2-wg^j_#l1j1$k6$urdf++u4'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
 
@@ -76,10 +76,14 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
     'http://3.129.93.58:1919',
+    'http://3.129.93.58:3111',
+    'http://65.2.37.143:1111',
 ] # If this is used, then not need to use `CORS_ORIGIN_ALLOW_ALL = True`
 CORS_ORIGIN_REGEX_WHITELIST = [
     'http://localhost:3000',
     'http://3.129.93.58:1919',
+    'http://3.129.93.58:3111',
+    'http://65.2.37.143:1111',
 ]
 
 
@@ -111,8 +115,9 @@ WSGI_APPLICATION = 'youtalk.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'testfilm' if DEBUG else 'filmmee_production',
+    #    'NAME': 'testfilm' if DEBUG else 'filmmee_production',
         #youtok7sept
+	'NAME': 'filmm' if DEBUG else 'filmmee_production',
         'USER':'postgres',
         'PASSWORD':'Mynameis@321',
         'HOST':'127.0.0.1',
@@ -170,10 +175,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 USE_S3 = os.getenv('USE_S3') == 'TRUE'
 
-AWS_ACCESS_KEY_ID = 'AKIASDQL7WB73VVZBQGE'
+AWS_ACCESS_KEY_ID = 'AKIAYEBIKAPZBSLNYZBI'
 AWS_DEFAULT_ACL = None
-AWS_SECRET_ACCESS_KEY = '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'
-AWS_STORAGE_BUCKET_NAME = 'utokcloud' if DEBUG else 'productioncloud'
+AWS_SECRET_ACCESS_KEY = '5b4qJHUaCZ4MQBxQqKDi2WTTJtKihRTHVx5TNOBp'
+AWS_STORAGE_BUCKET_NAME = 'filmme-test' if DEBUG else 'filmmee-prod'
 STATICFILES_STORAGE = 'youtalk.storage_backends.StaticStorage'
 AWS_S3_CUSTOM_DOMAIN = '%s.s3-accelerate.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
 AWS_S3_OBJECT_PARAMETERS = {
@@ -196,3 +201,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'

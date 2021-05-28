@@ -41,8 +41,8 @@ from firebase_admin import messaging
 from youtalk import settings
 
 
-VERSION = 26 #Refers to Application Version Code
-VERSION_STRING = "1.2.6"
+VERSION = 38 #Refers to Application Version Code
+VERSION_STRING = "1.3.8"
 STRICT = True #If True, Application won't proceed without user Updating the Application to Latest Build
 INVITATION_REWARD = 5
 MIN_WALLET_THRESHOLD = 50
@@ -821,7 +821,7 @@ class Timeline(APIView,CustomPagination2):
                     f.update({"profilePic":STORAGE_URL+"profile_dp/"+profilePic,"user_id":user_id.id})
             except:
                 pass        
-        final_data = serializer.data  
+        final_data = serializer.data
         random.shuffle(final_data)      
         return self.get_paginated_response(final_data)
 
