@@ -785,29 +785,28 @@ class Timeline(APIView,CustomPagination2):
         orderBy = ["-created"]
         # In future we need to get the timezone from client side to query the
         # posts accordingly
-        min_date = utils.getDateAtGap(-70 if settings.DEBUG is True else -7)
-        # orderBy = ["viewCount"]
-        # now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
-        # if now.minute <20:
-        #     if 21 <= now.hour <= 3:
-        #         orderBy = ["profId__gender"]
-        #     else:
-        #         orderBy = ["-viewCount","-created"]
-        # elif 20<= now.minute <=40:
-        #     if 12 <= now.hour <= 15:
-        #         orderBy = ["created"]
-        #     else:
-        #         orderBy = ["-created"]
-        # created__gt=min_date
+        min_date = utils.getDateAtGap(-70 if settings.DEBUG is True else -14)
+        orderBy = ["viewCount"]
+        now = datetime.datetime.now(tz=pytz.timezone("Asia/Kolkata"))
+        if now.minute <20:
+            if 21 <= now.hour <= 3:
+                orderBy = ["profId__gender"]
+            else:
+                orderBy = ["-viewCount","-created"]
+        elif 20<= now.minute <=40:
+            if 12 <= now.hour <= 15:
+                orderBy = ["created"]
+            else:
+                orderBy = ["-created"]
 
-        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy)
+        fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy)
         if pk != None and pk > 0 :
             blockRequests = BlockRequest.objects.filter(blockedBy=pk)
             userIds = blockRequests.values_list('blockedUser',flat=True)
             # TO EXCLUDE REPORTED POSTS - NOT WORKING DUE TO MULTIPLE "IN" EXCLUDES
             # reportedPosts = PostReportRequest.objects.filter(reportedBy=pk)
             # reportedPostIds = reportedPosts.values_list('post',flat=True)
-            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5).order_by(*orderBy).exclude(owner_id__in=userIds)
+            fileupload = FileUpload.objects.filter(privacy="public",reportsCount__lt=5,created__gt=min_date).order_by(*orderBy).exclude(owner_id__in=userIds)
         results = self.paginate_queryset(fileupload, request, view=self)
         serializer = FileUploadSerializer2(results, many=True)
         for f in serializer.data:    

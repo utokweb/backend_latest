@@ -35,9 +35,9 @@ def get_short_link(link):
                                     "androidPackageName": "com.sevenmbtech.utokcore",
                                     "androidMinPackageVersionCode":"12"
                                 },
-                                # "navigationInfo": {
-                                #     "enableForcedRedirect": True
-                                # },
+                                "navigationInfo": {
+                                    "enableForcedRedirect": True
+                                },
                                 "iosInfo": {
                                     "iosBundleId": "com.sevenmbtech.utokcore",
                                     "iosAppStoreId":"1542626766"

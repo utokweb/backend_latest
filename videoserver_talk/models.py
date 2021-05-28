@@ -330,8 +330,8 @@ def update_like_count(sender, instance, **kwargs):
         instance.postId.save()
         postData = instance.postId
 
-        
-        if postData.likeCount in [3,10,16,40,52,61,72,85,95,100]:
+        # in [3,10,16,40,52,61,72,85,95,100]
+        if postData.likeCount % 3 == 0 or postData.likeCount % 5 == 0:
             notificationType = "PostLike"
             notificationMessage = instance.user.username +" and "+str(postData.likeCount-1)+" others Liked your Post"
             try:
