@@ -17,6 +17,7 @@ from firebase_admin import credentials
 import datetime
 from firebase_admin import messaging
 from . import utils
+import random
 
 cred = credentials.Certificate('fcm.json')
 firebase_admin.initialize_app(cred)
@@ -326,7 +327,8 @@ class PostLike(models.Model):
 @receiver(post_save, sender=PostLike, dispatch_uid="increment_like_count")
 def update_like_count(sender, instance, **kwargs):
     if instance.like==1:
-        instance.postId.likeCount+=1
+        random_num = random.randint(1, 10)
+        instance.postId.likeCount+=random_num
         instance.postId.save()
         postData = instance.postId
 
@@ -394,7 +396,8 @@ class ViewModel(models.Model):
 
 @receiver(post_save, sender=ViewModel, dispatch_uid="increment_view_count")
 def update_view_count(sender, instance, **kwargs):    
-    instance.postId.viewCount+=1
+    random_num = random.randint(1, 70)
+    instance.postId.viewCount+=random_num
     instance.postId.save()    
 
 class FollowerModel(models.Model):
