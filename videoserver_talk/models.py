@@ -396,7 +396,7 @@ class ViewModel(models.Model):
 
 @receiver(post_save, sender=ViewModel, dispatch_uid="increment_view_count")
 def update_view_count(sender, instance, **kwargs):    
-    random_num = random.randint(1, 70)
+    random_num = random.randint(22, 95)
     instance.postId.viewCount+=random_num
     instance.postId.save()    
 
