@@ -787,9 +787,16 @@ class Timeline(APIView,CustomPagination2):
         random.shuffle(orders)
         factor = random.randint(1,4)
         for i in range(factor):
-             orderBy.append(random.choice(orders))
+            random_choice = random.choice(orders)
+            rc_backup = random_choice
+            if "-" in random_choice:
+                random_choice = random_choice.replace("-","")
+            if random_choice not in orderBy and ("-"+random_choice) not in orderBy:
+                orderBy.append(rc_backup)
         orderby = set(orderBy)     
         orderby = list(orderBy)
+        print("TIMELINE RESULTS ORDERED BY")
+        print(orderBy)
         # orderBy = ["-created"]
         # # In future we need to get the timezone from client side to query the
         # # posts accordingly
